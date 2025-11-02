@@ -1,3 +1,6 @@
+
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -7,7 +10,6 @@ import {
   Landmark,
   Repeat,
 } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +21,54 @@ import {
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { placeholderImages } from "@/lib/placeholder-images";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy, limit } from "firebase/firestore";
+import type { Habit, JournalEntry, Transaction } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMemo } from "react";
 
 export default function Dashboard() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  const habitsQuery = useMemoFirebase(() => 
+    user ? query(collection(firestore, `users/${user.uid}/habits`), orderBy("createdAt", "desc")) : null
+  , [user, firestore]);
+  const journalQuery = useMemoFirebase(() => 
+    user ? query(collection(firestore, `users/${user.uid}/journalEntries`), orderBy("date", "desc"), limit(5)) : null
+  , [user, firestore]);
+  const financesQuery = useMemoFirebase(() => 
+    user ? query(collection(firestore, `users/${user.uid}/financeRecords`), orderBy("date", "desc"), limit(5)) : null
+  , [user, firestore]);
+
+  const { data: habits, isLoading: habitsLoading } = useCollection<Habit>(habitsQuery);
+  const { data: journalEntries, isLoading: journalLoading } = useCollection<JournalEntry>(journalQuery);
+  const { data: transactions, isLoading: financesLoading } = useCollection<Transaction>(financesQuery);
+
   const dashboardImage = placeholderImages.find(p => p.id === 'dashboard-hero');
+  const isLoading = isUserLoading || habitsLoading || journalLoading || financesLoading;
+
+  const { habitProgress, habitStreak } = useMemo(() => {
+    if (!habits) return { habitProgress: 0, habitStreak: 0 };
+    const completedHabits = habits.filter(h => h.completed).length;
+    const habitProgress = habits.length > 0 ? (completedHabits / habits.length) * 100 : 0;
+    const habitStreak = habits.reduce((max, h) => h.streak > max ? h.streak : max, 0);
+    return { habitProgress, habitStreak };
+  }, [habits]);
+
+  const netFinances = useMemo(() => {
+    if (!transactions) return 0;
+    return transactions.reduce((acc, t) => acc + t.amount, 0);
+  }, [transactions]);
+  
+  const recentActivities = useMemo(() => {
+    const activities = [
+      ...(habits || []).map(h => ({ type: 'habit', data: h, date: new Date(h.createdAt) })),
+      ...(journalEntries || []).map(j => ({ type: 'journal', data: j, date: new Date(j.date) })),
+      ...(transactions || []).map(t => ({ type: 'finance', data: t, date: new Date(t.date) }))
+    ];
+    return activities.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 4);
+  }, [habits, journalEntries, transactions]);
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -38,9 +85,9 @@ export default function Dashboard() {
             <Repeat className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">75%</div>
+            {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{habitProgress.toFixed(0)}%</div>}
             <p className="text-xs text-muted-foreground">
-              +20.1% from last week
+              {habits?.filter(h => h.completed).length || 0} of {habits?.length || 0} habits completed today.
             </p>
           </CardContent>
         </Card>
@@ -52,7 +99,7 @@ export default function Dashboard() {
             <BookText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+12</div>
+            {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{journalEntries?.length || 0}</div>}
             <p className="text-xs text-muted-foreground">
               in the last 30 days
             </p>
@@ -61,12 +108,12 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Current Habit Streak
+              Longest Habit Streak
             </CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">21 Days</div>
+             {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{habitStreak} Days</div>}
             <p className="text-xs text-muted-foreground">
               Keep up the great work!
             </p>
@@ -80,9 +127,9 @@ export default function Dashboard() {
             <Landmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+Ksh 15,231.89</div>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className={`text-2xl font-bold ${netFinances >= 0 ? 'text-green-600' : 'text-red-600'}`}>Ksh {netFinances.toLocaleString()}</div>}
             <p className="text-xs text-muted-foreground">
-              +19% from last month
+              Recent transaction balance
             </p>
           </CardContent>
         </Card>
@@ -144,62 +191,74 @@ export default function Dashboard() {
                 An overview of your latest interactions.
               </CardDescription>
             </div>
-            <Button asChild size="sm" className="ml-auto gap-1">
-              <Link href="#">
-                View All
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
           </CardHeader>
-          <CardContent className="grid gap-8">
-            <div className="flex items-center gap-4">
-              <Repeat className="h-8 w-8 text-muted-foreground" />
-              <div className="grid gap-1">
-                <p className="text-sm font-medium leading-none">
-                  Completed "Morning Meditation"
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Habit logged
-                </p>
-              </div>
-              <div className="ml-auto font-medium">Streak: 5</div>
-            </div>
-            <div className="flex items-center gap-4">
-              <BookText className="h-8 w-8 text-muted-foreground" />
-              <div className="grid gap-1">
-                <p className="text-sm font-medium leading-none">
-                  New Journal Entry
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Mood: <span className="font-semibold">Optimistic</span>
-                </p>
-              </div>
-              <div className="ml-auto font-medium">Today</div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Landmark className="h-8 w-8 text-muted-foreground" />
-              <div className="grid gap-1">
-                <p className="text-sm font-medium leading-none">
-                  Expense Added
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Category: Groceries
-                </p>
-              </div>
-              <div className="ml-auto font-medium">-Ksh 3,500</div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Repeat className="h-8 w-8 text-muted-foreground" />
-              <div className="grid gap-1">
-                <p className="text-sm font-medium leading-none">
-                  Completed "Read 10 pages"
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Habit logged
-                </p>
-              </div>
-              <div className="ml-auto font-medium">Streak: 12</div>
-            </div>
+          <CardContent className="grid gap-6">
+            {isLoading && Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="grid gap-1 flex-1">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                    </div>
+                    <Skeleton className="h-4 w-12" />
+                </div>
+            ))}
+            {!isLoading && recentActivities.map((activity, i) => {
+              if (activity.type === 'habit') {
+                const habit = activity.data as Habit;
+                return (
+                  <div key={i} className="flex items-center gap-4">
+                    <Repeat className="h-8 w-8 text-muted-foreground" />
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium leading-none">
+                        {habit.completed ? "Completed" : "Logged"}: "{habit.name}"
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Habit {habit.completed ? "completed" : "logged"}
+                      </p>
+                    </div>
+                    <div className="ml-auto font-medium">Streak: {habit.streak}</div>
+                  </div>
+                );
+              }
+              if (activity.type === 'journal') {
+                const journal = activity.data as JournalEntry;
+                return (
+                  <div key={i} className="flex items-center gap-4">
+                    <BookText className="h-8 w-8 text-muted-foreground" />
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium leading-none">
+                        New Journal Entry
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Mood: <span className="font-semibold">{journal.analysis?.mood}</span>
+                      </p>
+                    </div>
+                    <div className="ml-auto font-medium text-xs">
+                        {new Date(journal.date).toLocaleDateString()}
+                    </div>
+                  </div>
+                );
+              }
+              if (activity.type === 'finance') {
+                const transaction = activity.data as Transaction;
+                return (
+                  <div key={i} className="flex items-center gap-4">
+                    <Landmark className="h-8 w-8 text-muted-foreground" />
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium leading-none">
+                        {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)} Added
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {transaction.description}
+                      </p>
+                    </div>
+                    <div className={`ml-auto font-medium ${transaction.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>Ksh {transaction.amount.toLocaleString()}</div>
+                  </div>
+                );
+              }
+              return null;
+            })}
           </CardContent>
         </Card>
       </div>

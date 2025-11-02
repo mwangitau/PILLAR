@@ -6,10 +6,12 @@ export type Habit = {
   name: string;
   completed: boolean;
   streak: number;
+  createdAt: string;
 };
 
 export type JournalEntry = {
-  id: string;
+  id:string;
+  userProfileId: string;
   date: string;
   content: string;
   analysis: JournalAnalysisOutput | null;
@@ -17,6 +19,7 @@ export type JournalEntry = {
 
 export type Transaction = {
     id: string;
+    userProfileId: string;
     date: string;
     description: string;
     type: 'income' | 'expense' | 'tithe';
