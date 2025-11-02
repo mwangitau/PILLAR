@@ -1,3 +1,16 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "landing-hero",
+      "description": "A person standing on a cliff looking at a beautiful sunrise.",
+      "imageUrl": "https://images.unsplash.com/photo-1500284530423-caa9b7859360?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxzdW5yaXNlJTIwY2xpZmZ8ZW58MHx8fHwxNzYyMDgyMzU0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sunrise cliff"
+    },
+    {
+      "id": "dashboard-hero",
+      "description": "A winding path through a sunlit forest.",
+      "imageUrl": "https://images.unsplash.com/photo-1520052600632-67420194a58f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxmb3Jlc3QlMjBwYXRofGVufDB8fHx8MTc2MjA0MTE1MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "forest path"
+    }
+  ]
 }
