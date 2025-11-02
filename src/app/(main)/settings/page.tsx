@@ -30,6 +30,12 @@ interface ProfileForm {
   name: string;
 }
 
+const defaultNotificationPreferences = {
+    habitReminders: true,
+    weeklySummary: true,
+    partnerUpdates: false,
+};
+
 export default function SettingsPage() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
@@ -41,11 +47,15 @@ export default function SettingsPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<ProfileForm>();
+  const { register, handleSubmit, reset, formState: { isSubmitting: isSavingProfile } } = useForm<ProfileForm>();
+  
+  const [prefs, setPrefs] = useState(userProfile?.notificationPreferences || defaultNotificationPreferences);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
       reset({ name: userProfile.name });
+      setPrefs(userProfile.notificationPreferences || defaultNotificationPreferences);
     }
   }, [userProfile, reset]);
 
@@ -57,6 +67,17 @@ export default function SettingsPage() {
       description: "Your name has been successfully updated.",
     });
   };
+
+  const handleSavePreferences = () => {
+    if (!userProfileRef) return;
+    setIsSavingPrefs(true);
+    updateDocumentNonBlocking(userProfileRef, { notificationPreferences: prefs });
+    toast({
+      title: "Preferences Saved",
+      description: "Your notification settings have been updated.",
+    });
+    setIsSavingPrefs(false);
+  }
 
   const handleDeleteAccount = async () => {
     if (!user) return;
@@ -114,7 +135,7 @@ export default function SettingsPage() {
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="name">Name</Label>
-                    <Input id="name" {...register("name", { required: true })} />
+                    <Input id="name" {...register("name", { required: true })} disabled={isSavingProfile}/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
@@ -124,8 +145,8 @@ export default function SettingsPage() {
               )}
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isLoading || isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={isLoading || isSavingProfile}>
+                {isSavingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Profile
               </Button>
             </CardFooter>
@@ -140,30 +161,45 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <Label htmlFor="reminders" className="font-medium">Habit Reminders</Label>
-                    <p className="text-sm text-muted-foreground">Receive push notifications to complete your habits.</p>
+            { isLoading ? Array.from({length: 3}).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                    <div className="flex-1">
+                        <Skeleton className="h-5 w-32 mb-2"/>
+                        <Skeleton className="h-4 w-4/5"/>
+                    </div>
+                    <Skeleton className="h-6 w-11 rounded-full"/>
                 </div>
-              <Switch id="reminders" defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-                <div>
-                    <Label htmlFor="weekly-summary" className="font-medium">Weekly Summary</Label>
-                    <p className="text-sm text-muted-foreground">Get a weekly email with your progress summary.</p>
-                </div>
-              <Switch id="weekly-summary" defaultChecked />
-            </div>
-             <div className="flex items-center justify-between">
-                <div>
-                    <Label htmlFor="partner-updates" className="font-medium">Partner Updates</Label>
-                    <p className="text-sm text-muted-foreground">Notify me when an accountability partner checks my report.</p>
-                </div>
-              <Switch id="partner-updates" />
-            </div>
+            )) : (
+                <>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Label htmlFor="reminders" className="font-medium">Habit Reminders</Label>
+                            <p className="text-sm text-muted-foreground">Receive push notifications to complete your habits.</p>
+                        </div>
+                        <Switch id="reminders" checked={prefs.habitReminders} onCheckedChange={(checked) => setPrefs(p => ({...p, habitReminders: checked}))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Label htmlFor="weekly-summary" className="font-medium">Weekly Summary</Label>
+                            <p className="text-sm text-muted-foreground">Get a weekly email with your progress summary.</p>
+                        </div>
+                        <Switch id="weekly-summary" checked={prefs.weeklySummary} onCheckedChange={(checked) => setPrefs(p => ({...p, weeklySummary: checked}))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Label htmlFor="partner-updates" className="font-medium">Partner Updates</Label>
+                            <p className="text-sm text-muted-foreground">Notify me when an accountability partner checks my report.</p>
+                        </div>
+                        <Switch id="partner-updates" checked={prefs.partnerUpdates} onCheckedChange={(checked) => setPrefs(p => ({...p, partnerUpdates: checked}))} />
+                    </div>
+                </>
+            )}
           </CardContent>
           <CardFooter>
-            <Button>Save Preferences</Button>
+            <Button onClick={handleSavePreferences} disabled={isLoading || isSavingPrefs}>
+                {isSavingPrefs && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Preferences
+            </Button>
           </CardFooter>
         </Card>
 

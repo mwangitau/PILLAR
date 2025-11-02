@@ -31,6 +31,11 @@ export type UserProfile = {
   name: string;
   email: string;
   onboardingDataId: string;
+  notificationPreferences?: {
+    habitReminders: boolean;
+    weeklySummary: boolean;
+    partnerUpdates: boolean;
+  };
 };
 
 export type OnboardingData = {
