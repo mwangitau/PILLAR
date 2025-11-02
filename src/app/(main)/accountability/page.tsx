@@ -15,6 +15,7 @@ import type { AccountabilityPartner } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { generateReport, type GenerateReportInput } from "@/ai/flows/generate-report";
+import { downloadUserData } from "@/ai/flows/download-user-data";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -33,6 +34,7 @@ export default function AccountabilityPage() {
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [reportContent, setReportContent] = useState("");
   const [reportTitle, setReportTitle] = useState("");
 
@@ -81,6 +83,36 @@ export default function AccountabilityPage() {
         setIsReportDialogOpen(false);
     } finally {
         setIsGeneratingReport(false);
+    }
+  }
+
+  const handleFullExport = async () => {
+    if (!user) return;
+    setIsExporting(true);
+    try {
+      const result = await downloadUserData({ userId: user.uid });
+      const blob = new Blob([result.jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pillar-data.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Export Successful",
+        description: "Your data has been downloaded as pillar-data.json.",
+      });
+    } catch (error) {
+      console.error("Failed to export data:", error);
+      toast({
+        title: "Error Exporting Data",
+        description: "Could not export your data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -186,7 +218,10 @@ export default function AccountabilityPage() {
                   <Button variant="outline" onClick={() => handleGenerateReport('habits', 'weekly', 'Weekly Habit Report')}>Weekly Habit Report</Button>
                   <Button variant="outline" onClick={() => handleGenerateReport('journal', 'monthly', 'Monthly Journal Summary')}>Monthly Journal Summary</Button>
                   <Button variant="outline" onClick={() => handleGenerateReport('finances', 'monthly', 'Financial Overview')}>Financial Overview</Button>
-                  <Button variant="outline" disabled>Full Manual Export</Button>
+                  <Button variant="outline" onClick={handleFullExport} disabled={isExporting}>
+                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                    Full Manual Export
+                  </Button>
               </CardContent>
           </Card>
       </div>
