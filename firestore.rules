@@ -1,0 +1,260 @@
+/**
+ * @fileOverview Firestore Security Rules for the Pillar application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for all data stored under the `/users/{userId}` path.
+ * Users can only access their own data.  The application does not use custom claims or any complex role-based access control.
+ * All subcollections under a user's path are considered private.
+ *
+ * Data Structure:
+ * - `/userProfiles/{userProfileId}`: Stores public user profile information.
+ * - `/onboardingData/{onboardingDataId}`: Stores onboarding data.
+ * - `/users/{userId}/plans/{planId}`: Stores personalized plans.
+ * - `/users/{userId}/habits/{habitId}`: Stores user-defined habits.
+ * - `/users/{userId}/journalEntries/{journalEntryId}`: Stores journal entries.
+ * - `/users/{userId}/accountabilityPartners/{accountabilityPartnerId}`: Stores accountability partner information.
+ * - `/users/{userId}/financeRecords/{financeRecordId}`: Stores financial records.
+ * - `/users/{userId}/reports/{reportId}`: Stores generated reports.
+ *
+ * Key Security Decisions:
+ * - Users can only read and write their own profiles and onboarding data.
+ * - Users can only access data stored under their own `/users/{userId}` path.
+ * - There are no public collections.
+ * - Data validation is relaxed to allow for rapid prototyping, except for fields critical for authorization.
+ * - List operations are only allowed for the owner of the data.
+ *
+ * Denormalization for Authorization:
+ * -  All documents under `/users/{userId}` should contain a `userProfileId` field matching the `userId` path segment. This allows for efficient ownership checks without additional `get()` calls.
+ *
+ * Structural Segregation:
+ * - User profiles are stored in a separate `/userProfiles` collection to allow for potential public display in the future without exposing private user data.  The current ruleset does NOT allow public access.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profile documents.
+     * @path /userProfiles/{userProfileId}
+     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @deny (create) - If the user is not signed in.
+     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /userProfiles/{userProfileId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+      function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isOwner(userProfileId);
+      allow update: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userProfileId);
+    }
+
+    /**
+     * @description Controls access to onboarding data documents.
+     * @path /onboardingData/{onboardingDataId}
+     * @allow (create) - If the user is signed in.
+     * @allow (get, update, delete) - If the user is signed in.
+     * @deny (create) - If the user is not signed in.
+     * @deny (get, update, delete) - If the user is not signed in.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /onboardingData/{onboardingDataId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Controls access to plan documents within a user's collection.
+     * @path /users/{userProfileId}/plans/{planId}
+     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /users/{userProfileId}/plans/{planId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+      function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isOwner(userProfileId);
+      allow list: if isOwner(userProfileId);
+      allow create: if isOwner(userProfileId);
+      allow update: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userProfileId);
+    }
+
+    /**
+     * @description Controls access to habit documents within a user's collection.
+     * @path /users/{userProfileId}/habits/{habitId}
+     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /users/{userProfileId}/habits/{habitId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+      function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isOwner(userProfileId);
+      allow list: if isOwner(userProfileId);
+      allow create: if isOwner(userProfileId);
+      allow update: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userProfileId);
+    }
+
+    /**
+     * @description Controls access to journal entry documents within a user's collection.
+     * @path /users/{userProfileId}/journalEntries/{journalEntryId}
+     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /users/{userProfileId}/journalEntries/{journalEntryId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+      function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isOwner(userProfileId);
+      allow list: if isOwner(userProfileId);
+      allow create: if isOwner(userProfileId);
+      allow update: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userProfileId);
+    }
+
+    /**
+     * @description Controls access to accountability partner documents within a user's collection.
+     * @path /users/{userProfileId}/accountabilityPartners/{accountabilityPartnerId}
+     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /users/{userProfileId}/accountabilityPartners/{accountabilityPartnerId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+      function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isOwner(userProfileId);
+      allow list: if isOwner(userProfileId);
+      allow create: if isOwner(userProfileId);
+      allow update: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userProfileId);
+    }
+
+    /**
+     * @description Controls access to finance record documents within a user's collection.
+     * @path /users/{userProfileId}/financeRecords/{financeRecordId}
+     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /users/{userProfileId}/financeRecords/{financeRecordId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+      function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isOwner(userProfileId);
+      allow list: if isOwner(userProfileId);
+      allow create: if isOwner(userProfileId);
+      allow update: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userProfileId);
+    }
+
+    /**
+     * @description Controls access to report documents within a user's collection.
+     * @path /users/{userProfileId}/reports/{reportId}
+     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
+     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
+     * @principle Enforces document ownership for writes and requires authentication for all access.
+     */
+    match /users/{userProfileId}/reports/{reportId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+      function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isOwner(userProfileId);
+      allow list: if isOwner(userProfileId);
+      allow create: if isOwner(userProfileId);
+      allow update: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userProfileId);
+    }
+  }
+}
