@@ -26,6 +26,7 @@ import { collection, query, orderBy, limit } from "firebase/firestore";
 import type { Habit, JournalEntry, Transaction } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
+import { format } from "date-fns";
 
 export default function Dashboard() {
   const { user, isUserLoading } = useUser();
@@ -52,7 +53,7 @@ export default function Dashboard() {
     if (!habits) return { habitProgress: 0, habitStreak: 0 };
     const completedHabits = habits.filter(h => h.completed).length;
     const habitProgress = habits.length > 0 ? (completedHabits / habits.length) * 100 : 0;
-    const habitStreak = habits.reduce((max, h) => h.streak > max ? h.streak : max, 0);
+    const habitStreak = habits.reduce((max, h) => (h.streak || 0) > max ? h.streak : max, 0);
     return { habitProgress, habitStreak };
   }, [habits]);
 
@@ -217,7 +218,7 @@ export default function Dashboard() {
                         Habit {habit.completed ? "completed" : "logged"}
                       </p>
                     </div>
-                    <div className="ml-auto font-medium">Streak: {habit.streak}</div>
+                    <div className="ml-auto font-medium">Streak: {habit.streak || 0}</div>
                   </div>
                 );
               }
@@ -235,7 +236,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div className="ml-auto font-medium text-xs">
-                        {new Date(journal.date).toLocaleDateString()}
+                        {format(new Date(journal.date), 'P')}
                     </div>
                   </div>
                 );
@@ -264,4 +265,5 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
+
+    
