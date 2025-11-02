@@ -1,3 +1,4 @@
+
 import type { JournalAnalysisOutput } from "@/ai/flows/ai-driven-journaling-analysis";
 
 export type Habit = {
@@ -20,4 +21,23 @@ export type Transaction = {
     description: string;
     type: 'income' | 'expense' | 'tithe';
     amount: number;
+};
+
+export type UserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  onboardingDataId: string;
+};
+
+export type OnboardingData = {
+  id: string;
+  answers: string;
+};
+
+export type Plan = {
+  id: string;
+  userProfileId: string;
+  content: string;
+  createdAt: string;
 };

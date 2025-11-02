@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -9,7 +10,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send, Bot, User, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth, initiateAnonymousSignIn } from "@/firebase";
+import { useAuth, initiateAnonymousSignIn, addDocumentNonBlocking, setDocumentNonBlocking, useUser } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
+import { useFirestore } from "@/firebase/provider";
 
 type Message = {
   sender: "user" | "ai";
@@ -19,6 +22,8 @@ type Message = {
 export function OnboardingChat() {
   const router = useRouter();
   const auth = useAuth();
+  const firestore = useFirestore();
+  const { user } = useUser();
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "ai",
@@ -33,8 +38,10 @@ export function OnboardingChat() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    initiateAnonymousSignIn(auth);
-  }, [auth]);
+    if (!user) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [auth, user]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -65,6 +72,7 @@ export function OnboardingChat() {
       setProfile(response.profile);
       if (response.isComplete) {
         setIsComplete(true);
+        await saveOnboardingData(response.profile);
       }
     } catch (error) {
       console.error("Chat error:", error);
@@ -75,6 +83,29 @@ export function OnboardingChat() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const saveOnboardingData = async (finalProfile: any) => {
+    if (!user || !firestore) return;
+    try {
+      // 1. Save onboarding answers
+      const onboardingData = { answers: JSON.stringify(finalProfile) };
+      const onboardingCol = collection(firestore, 'onboardingData');
+      const onboardingDocRef = await addDocumentNonBlocking(onboardingCol, onboardingData);
+
+      // 2. Create user profile
+      const userProfileRef = doc(firestore, "userProfiles", user.uid);
+      const userProfileData = {
+        id: user.uid,
+        name: finalProfile.name || "Anonymous User",
+        email: user.email || "",
+        onboardingDataId: onboardingDocRef.id,
+      };
+      setDocumentNonBlocking(userProfileRef, userProfileData, { merge: true });
+
+    } catch (error) {
+      console.error("Error saving onboarding data:", error);
     }
   };
 
