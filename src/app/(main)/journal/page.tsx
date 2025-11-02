@@ -10,43 +10,40 @@ import { BookMarked, Bot, Loader2, Sparkles } from "lucide-react";
 import type { JournalEntry } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-
-const initialEntries: JournalEntry[] = [
-  {
-    id: "1",
-    date: "2024-07-20",
-    content: "Felt really productive today. Managed to tackle a big project at work and still had energy to go for a run. The evening was peaceful. Feeling optimistic about the week ahead.",
-    analysis: { mood: "Optimistic, Accomplished", sentiment: "Positive" },
-  },
-  {
-    id: "2",
-    date: "2024-07-19",
-    content: "A bit of a stressful day. A lot of meetings and tight deadlines. Felt drained by the end of it. Hoping for a better day tomorrow.",
-    analysis: { mood: "Stressed, Tired", sentiment: "Negative" },
-  },
-];
+import { useFirestore, useUser, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase";
+import { collection, orderBy, query } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function JournalPage() {
-  const [entries, setEntries] = useState<JournalEntry[]>(initialEntries);
+  const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
+
+  const journalCollection = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, "users", user.uid, "journalEntries"), orderBy("date", "desc"));
+  }, [firestore, user]);
+
+  const { data: entries, isLoading: areEntriesLoading } = useCollection<Omit<JournalEntry, 'id'>>(journalCollection);
+
   const [newEntryContent, setNewEntryContent] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
 
   const handleSaveEntry = async () => {
-    if (newEntryContent.trim() === "") return;
-    setIsLoading(true);
+    if (newEntryContent.trim() === "" || !journalCollection) return;
+    setIsAnalyzing(true);
 
     try {
       const analysis: JournalAnalysisOutput = await analyzeJournalEntry({ journalEntry: newEntryContent });
       
-      const newEntry: JournalEntry = {
-        id: Date.now().toString(),
-        date: new Date().toISOString().split("T")[0],
+      const newEntry = {
+        date: new Date().toISOString(),
         content: newEntryContent,
         analysis,
       };
 
-      setEntries([newEntry, ...entries]);
+      addDocumentNonBlocking(collection(firestore, "users", user!.uid, "journalEntries"), newEntry);
+
       setNewEntryContent("");
       toast({
         title: "Journal Entry Saved",
@@ -60,9 +57,11 @@ export default function JournalPage() {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
   };
+
+  const isLoading = isUserLoading || areEntriesLoading;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-8">
@@ -82,12 +81,12 @@ export default function JournalPage() {
             onChange={(e) => setNewEntryContent(e.target.value)}
             placeholder="Write about your day, your thoughts, or anything that comes to mind..."
             rows={8}
-            disabled={isLoading}
+            disabled={isAnalyzing}
           />
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSaveEntry} disabled={isLoading || newEntryContent.trim() === ""}>
-            {isLoading ? (
+          <Button onClick={handleSaveEntry} disabled={isAnalyzing || newEntryContent.trim() === ""}>
+            {isAnalyzing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Analyzing & Saving...
@@ -107,7 +106,24 @@ export default function JournalPage() {
             <BookMarked className="h-7 w-7"/> Past Entries
         </h2>
         <div className="space-y-6">
-          {entries.map((entry) => (
+          {isLoading && Array.from({ length: 3 }).map((_, i) => (
+             <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-5 w-48" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-secondary/50 p-4 rounded-b-lg">
+                    <Skeleton className="h-8 w-40" />
+                </CardFooter>
+              </Card>
+          ))}
+          {!isLoading && entries?.map((entry) => (
             <Card key={entry.id}>
               <CardHeader>
                 <CardTitle className="text-lg">
