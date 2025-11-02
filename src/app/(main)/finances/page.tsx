@@ -39,15 +39,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowDownCircle, ArrowUpCircle, Plus, Landmark } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Plus, Landmark, Loader2 } from "lucide-react";
 import type { Transaction } from "@/lib/types";
 import { useFirestore, useUser, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { initiateTithePayment } from "@/ai/flows/initiate-tithe-payment";
 
 export default function FinancesPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const financeCollection = useMemoFirebase(() => {
     if (!user) return null;
@@ -56,21 +59,48 @@ export default function FinancesPage() {
 
   const { data: transactions, isLoading: areTransactionsLoading } = useCollection<Transaction>(financeCollection);
   
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddTxDialogOpen, setIsAddTxDialogOpen] = useState(false);
+  const [isTitheDialogOpen, setIsTitheDialogOpen] = useState(false);
+  const [isTithing, setIsTithing] = useState(false);
+  const [titheAmount, setTitheAmount] = useState<number | string>("");
   
   const { control, handleSubmit, register, reset } = useForm<Omit<Transaction, 'id'>>();
 
   const handleAddTransaction = (data: Omit<Transaction, 'id'>) => {
-    if (!financeCollection) return;
+    if (!user) return;
     const amount = parseFloat(String(data.amount));
     const newTransaction = {
       ...data,
       amount: data.type === 'income' ? Math.abs(amount) : -Math.abs(amount),
       date: new Date().toISOString(),
+      userProfileId: user.uid,
     };
-    addDocumentNonBlocking(collection(firestore, "users", user!.uid, "financeRecords"), newTransaction);
+    addDocumentNonBlocking(collection(firestore, "users", user.uid, "financeRecords"), newTransaction);
     reset({ description: "", amount: 0, type: undefined });
-    setIsDialogOpen(false);
+    setIsAddTxDialogOpen(false);
+  };
+  
+  const handlePayTithe = async () => {
+    if (!user || !titheAmount || +titheAmount <= 0) {
+        toast({ title: "Invalid Amount", description: "Please enter a valid amount to tithe.", variant: "destructive" });
+        return;
+    }
+    setIsTithing(true);
+    try {
+        const result = await initiateTithePayment({ userId: user.uid, amount: +titheAmount });
+        toast({
+            title: result.success ? "Payment Initiated" : "Payment Failed",
+            description: result.message,
+            variant: result.success ? "default" : "destructive",
+        });
+    } catch (error) {
+        console.error("Tithe payment error:", error);
+        toast({ title: "Error", description: "An unexpected error occurred. Please try again.", variant: "destructive" });
+    } finally {
+        setIsTithing(false);
+        setIsTitheDialogOpen(false);
+        setTitheAmount("");
+    }
   };
 
   const isLoading = isUserLoading || areTransactionsLoading;
@@ -87,63 +117,94 @@ export default function FinancesPage() {
         description="A light ledger for your income, expenses, and tithes."
       >
         <div className="flex gap-2">
-            <Button variant="outline">
-                <Landmark className="mr-2 h-4 w-4" /> Pay Tithe (M-Pesa)
-            </Button>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                <Plus className="mr-2 h-4 w-4" /> Add Transaction
+            <Dialog open={isTitheDialogOpen} onOpenChange={setIsTitheDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                    <Landmark className="mr-2 h-4 w-4" /> Pay Tithe (M-Pesa)
                 </Button>
-            </DialogTrigger>
-            <DialogContent>
+              </DialogTrigger>
+              <DialogContent>
                 <DialogHeader>
-                <DialogTitle className="font-headline">New Transaction</DialogTitle>
-                <DialogDescription>
-                    Log a new income, expense, or tithe payment.
-                </DialogDescription>
+                  <DialogTitle className="font-headline">Pay Tithe via M-Pesa</DialogTitle>
+                  <DialogDescription>
+                    Enter the amount you would like to tithe. This will simulate a payment initiation.
+                  </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(handleAddTransaction)}>
-                  <div className="grid gap-4 py-4">
+                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Input id="description" placeholder="e.g. Groceries" {...register("description", { required: true })} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="amount">Amount (Ksh)</Label>
-                        <Input id="amount" type="number" placeholder="e.g. 5000" {...register("amount", { required: true, valueAsNumber: true })} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="type">Category</Label>
-                        <Controller
-                          name="type"
-                          control={control}
-                          rules={{ required: true }}
-                          render={({ field }) => (
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <SelectTrigger id="type">
-                                  <SelectValue placeholder="Select category" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  <SelectItem value="income">Income</SelectItem>
-                                  <SelectItem value="expense">Expense</SelectItem>
-                                  <SelectItem value="tithe">Tithe</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
+                        <Label htmlFor="tithe-amount">Amount (Ksh)</Label>
+                        <Input 
+                          id="tithe-amount" 
+                          type="number" 
+                          placeholder="e.g. 1000" 
+                          value={titheAmount}
+                          onChange={(e) => setTitheAmount(e.target.value)}
+                          disabled={isTithing}
                         />
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button type="submit">Save Transaction</Button>
-                  </DialogFooter>
-                </form>
-            </DialogContent>
+                <DialogFooter>
+                  <Button onClick={handlePayTithe} disabled={isTithing}>
+                    {isTithing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Landmark className="mr-2 h-4 w-4" />}
+                    {isTithing ? 'Processing...' : 'Initiate Payment'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isAddTxDialogOpen} onOpenChange={setIsAddTxDialogOpen}>
+              <DialogTrigger asChild>
+                  <Button>
+                  <Plus className="mr-2 h-4 w-4" /> Add Transaction
+                  </Button>
+              </DialogTrigger>
+              <DialogContent>
+                  <DialogHeader>
+                  <DialogTitle className="font-headline">New Transaction</DialogTitle>
+                  <DialogDescription>
+                      Log a new income, expense, or tithe payment.
+                  </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit(handleAddTransaction)}>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                          <Label htmlFor="description">Description</Label>
+                          <Input id="description" placeholder="e.g. Groceries" {...register("description", { required: true })} />
+                      </div>
+                      <div className="grid gap-2">
+                          <Label htmlFor="amount">Amount (Ksh)</Label>
+                          <Input id="amount" type="number" placeholder="e.g. 5000" {...register("amount", { required: true, valueAsNumber: true })} />
+                      </div>
+                      <div className="grid gap-2">
+                          <Label htmlFor="type">Category</Label>
+                          <Controller
+                            name="type"
+                            control={control}
+                            rules={{ required: true }}
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <SelectTrigger id="type">
+                                    <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="income">Income</SelectItem>
+                                    <SelectItem value="expense">Expense</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit">Save Transaction</Button>
+                    </DialogFooter>
+                  </form>
+              </DialogContent>
             </Dialog>
         </div>
       </PageHeader>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
+      <div className="grid gap-4 md:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
@@ -160,6 +221,15 @@ export default function FinancesPage() {
           </CardHeader>
           <CardContent>
              {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">Ksh {Math.abs(totalExpenses).toLocaleString()}</div>}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tithe Paid</CardTitle>
+            <Landmark className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+             {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">Ksh {Math.abs(totalTithe).toLocaleString()}</div>}
           </CardContent>
         </Card>
         <Card>
@@ -207,7 +277,7 @@ export default function FinancesPage() {
                       {t.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className={`text-right font-semibold ${t.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <TableCell className={`text-right font-semibold ${t.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {t.amount.toLocaleString()}
                   </TableCell>
                 </TableRow>

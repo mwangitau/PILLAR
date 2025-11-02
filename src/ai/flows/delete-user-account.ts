@@ -12,7 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { initializeApp, getApps, App } from 'firebase-admin/app';
+import { getFirebaseApp } from '@/firebase/server-initialization';
 
 const DeleteUserAccountInputSchema = z.object({
   userId: z.string().describe("The ID of the user to delete."),
@@ -25,13 +25,7 @@ const DeleteUserAccountOutputSchema = z.object({
 });
 export type DeleteUserAccountOutput = z.infer<typeof DeleteUserAccountOutputSchema>;
 
-let app: App;
-if (!getApps().length) {
-  app = initializeApp();
-} else {
-  app = getApps()[0];
-}
-
+const app = getFirebaseApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
 
