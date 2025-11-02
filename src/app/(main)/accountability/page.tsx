@@ -8,20 +8,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Share2, UserPlus, Users, X } from "lucide-react";
+import { Loader2, Share2, UserPlus, Users, X } from "lucide-react";
 import { useFirestore, useUser, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking, useMemoFirebase } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import type { AccountabilityPartner } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { generateReport, type GenerateReportInput } from "@/ai/flows/generate-report";
+import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface InvitePartnerForm {
   email: string;
 }
 
+type ReportType = GenerateReportInput['reportType'];
+type Timeframe = GenerateReportInput['timeframe'];
+
 export default function AccountabilityPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { register, handleSubmit, reset } = useForm<InvitePartnerForm>();
+  const { toast } = useToast();
+
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportContent, setReportContent] = useState("");
+  const [reportTitle, setReportTitle] = useState("");
 
   const partnersCollection = useMemoFirebase(() => 
     user ? collection(firestore, `users/${user.uid}/accountabilityPartners`) : null
@@ -31,14 +44,12 @@ export default function AccountabilityPage() {
 
   const handleInvitePartner = (data: InvitePartnerForm) => {
     if (!partnersCollection) return;
-    // In a real app, you'd also send an email invitation.
-    // For now, we'll just add them to the list.
     const newPartner = {
         partnerEmail: data.email,
-        // For now, we extract a mock name from the email.
         name: data.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
         permissions: "{}",
         consentLog: "[]",
+        userProfileId: user!.uid,
     };
     addDocumentNonBlocking(partnersCollection, newPartner);
     reset();
@@ -49,6 +60,29 @@ export default function AccountabilityPage() {
     const partnerDocRef = doc(partnersCollection, partnerId);
     deleteDocumentNonBlocking(partnerDocRef);
   };
+  
+  const handleGenerateReport = async (reportType: ReportType, timeframe: Timeframe, title: string) => {
+    if (!user) return;
+    setIsGeneratingReport(true);
+    setReportTitle(title);
+    setReportContent("");
+    setIsReportDialogOpen(true);
+
+    try {
+        const result = await generateReport({ userId: user.uid, reportType, timeframe });
+        setReportContent(result.report);
+    } catch (error) {
+        console.error("Failed to generate report:", error);
+        toast({
+            title: "Error Generating Report",
+            description: "Could not generate your report. Please try again.",
+            variant: "destructive"
+        });
+        setIsReportDialogOpen(false);
+    } finally {
+        setIsGeneratingReport(false);
+    }
+  }
 
   const isLoading = isUserLoading || partnersLoading;
 
@@ -146,16 +180,35 @@ export default function AccountabilityPage() {
                       <Share2 className="h-6 w-6"/>
                       Share Reports
                   </CardTitle>
-                  <CardDescription>Generate and share reports with your partners. PDFs are generated in the background and you'll be notified when ready.</CardDescription>
+                  <CardDescription>Generate and share reports with your partners. AI summaries are generated and displayed for you to share.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button variant="outline">Weekly Habit Report</Button>
-                  <Button variant="outline">Monthly Journal Summary</Button>
-                  <Button variant="outline">Financial Overview</Button>
-                  <Button variant="outline">Full Manual Export</Button>
+                  <Button variant="outline" onClick={() => handleGenerateReport('habits', 'weekly', 'Weekly Habit Report')}>Weekly Habit Report</Button>
+                  <Button variant="outline" onClick={() => handleGenerateReport('journal', 'monthly', 'Monthly Journal Summary')}>Monthly Journal Summary</Button>
+                  <Button variant="outline" onClick={() => handleGenerateReport('finances', 'monthly', 'Financial Overview')}>Financial Overview</Button>
+                  <Button variant="outline" disabled>Full Manual Export</Button>
               </CardContent>
           </Card>
       </div>
+      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-headline">{reportTitle}</DialogTitle>
+            <DialogDescription>
+              This is a preview of the report. You can copy this text to share with your accountability partner.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] p-4 border rounded-md">
+            {isGeneratingReport ? (
+                <div className="flex items-center justify-center h-48">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+                </div>
+            ) : (
+                <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: reportContent.replace(/\n/g, '<br />') }} />
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
