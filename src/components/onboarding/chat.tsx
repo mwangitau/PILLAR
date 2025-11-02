@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send, Bot, User, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth, initiateAnonymousSignIn } from "@/firebase";
 
 type Message = {
   sender: "user" | "ai";
@@ -17,6 +18,7 @@ type Message = {
 
 export function OnboardingChat() {
   const router = useRouter();
+  const auth = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "ai",
@@ -29,6 +31,10 @@ export function OnboardingChat() {
   const [profile, setProfile] = useState({});
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    initiateAnonymousSignIn(auth);
+  }, [auth]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
