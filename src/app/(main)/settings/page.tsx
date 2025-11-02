@@ -1,3 +1,8 @@
+
+"use client";
+
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,8 +16,44 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 import { Switch } from "@/components/ui/switch";
+import { useUser, useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
+import type { UserProfile } from "@/lib/types";
+import { doc } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
+
+interface ProfileForm {
+  name: string;
+}
 
 export default function SettingsPage() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<ProfileForm>();
+
+  useEffect(() => {
+    if (userProfile) {
+      reset({ name: userProfile.name });
+    }
+  }, [userProfile, reset]);
+
+  const handleUpdateProfile = (data: ProfileForm) => {
+    if (!userProfileRef) return;
+    updateDocumentNonBlocking(userProfileRef, { name: data.name });
+    toast({
+      title: "Profile Updated",
+      description: "Your name has been successfully updated.",
+    });
+  };
+
+  const isLoading = isUserLoading || isUserProfileLoading;
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-8">
       <PageHeader
@@ -21,25 +62,45 @@ export default function SettingsPage() {
       />
       <div className="grid gap-8">
         <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">Profile</CardTitle>
-            <CardDescription>
-              This is how others will see you on the site.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" defaultValue="Alex Doe" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue="alex@example.com" />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button>Save Profile</Button>
-          </CardFooter>
+          <form onSubmit={handleSubmit(handleUpdateProfile)}>
+            <CardHeader>
+              <CardTitle className="font-headline">Profile</CardTitle>
+              <CardDescription>
+                This is how others will see you on the site.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoading ? (
+                <>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input id="name" {...register("name", { required: true })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={userProfile?.email || ''} readOnly disabled />
+                  </div>
+                </>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" disabled={isLoading || isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Profile
+              </Button>
+            </CardFooter>
+          </form>
         </Card>
 
         <Card>

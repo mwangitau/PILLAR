@@ -1,7 +1,8 @@
+
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +25,12 @@ import {
   Users,
 } from "lucide-react";
 import { PillarLogo } from "@/components/icons/logo";
+import { useUser, useDoc, useMemoFirebase, useAuth } from "@/firebase";
+import { signOut } from "firebase/auth";
+import type { UserProfile } from "@/lib/types";
+import { doc } from "firebase/firestore";
+import { useFirestore } from "@/firebase/provider";
+import { Skeleton } from "../ui/skeleton";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -36,6 +43,20 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/');
+  };
+
+  const isLoading = isUserLoading || isUserProfileLoading;
 
   return (
     <>
@@ -80,21 +101,33 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Log out">
+                <SidebarMenuButton tooltip="Log out" onClick={handleLogout}>
                     <LogOut />
                     <span>Log Out</span>
                 </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
           <div className="flex items-center gap-3 p-2 mt-2">
-            <Avatar>
-              <AvatarImage src="https://i.pravatar.cc/150?u=a042581f4e29026703d" />
-              <AvatarFallback>A</AvatarFallback>
-            </Avatar>
-            <div className="overflow-hidden">
-                <p className="font-semibold text-sm truncate">Alex Doe</p>
-                <p className="text-xs text-muted-foreground truncate">alex@example.com</p>
-            </div>
+            {isLoading ? (
+                <>
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-full" />
+                    </div>
+                </>
+            ) : (
+                <>
+                    <Avatar>
+                      <AvatarImage src={`https://i.pravatar.cc/150?u=${userProfile?.email}`} />
+                      <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div className="overflow-hidden">
+                        <p className="font-semibold text-sm truncate">{userProfile?.name || "User"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{userProfile?.email || ""}</p>
+                    </div>
+                </>
+            )}
           </div>
         </SidebarFooter>
       </Sidebar>
