@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,27 +41,43 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ArrowDownCircle, ArrowUpCircle, Plus, Landmark } from "lucide-react";
 import type { Transaction } from "@/lib/types";
-
-const initialTransactions: Transaction[] = [
-  { id: "1", date: "2024-07-20", description: "Salary", category: "income", amount: 150000 },
-  { id: "2", date: "2024-07-20", description: "Tithe", category: "tithe", amount: -15000 },
-  { id: "3", date: "2024-07-19", description: "Groceries", category: "expense", amount: -4500 },
-  { id: "4", date: "2024-07-18", description: "Freelance Project", category: "income", amount: 25000 },
-  { id: "5", date: "2024-07-17", description: "Rent", category: "expense", amount: -40000 },
-];
+import { useFirestore, useUser, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function FinancesPage() {
-  const [transactions, setTransactions] = useState(initialTransactions);
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
 
-  const totalIncome = transactions
-    .filter((t) => t.category === "income")
-    .reduce((acc, t) => acc + t.amount, 0);
-  const totalExpenses = transactions
-    .filter((t) => t.category === "expense")
-    .reduce((acc, t) => acc + t.amount, 0);
-  const totalTithe = transactions
-    .filter((t) => t.category === "tithe")
-    .reduce((acc, t) => acc + t.amount, 0);
+  const financeCollection = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, "users", user.uid, "financeRecords"), orderBy("date", "desc"));
+  }, [firestore, user]);
+
+  const { data: transactions, isLoading: areTransactionsLoading } = useCollection<Transaction>(financeCollection);
+  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const { control, handleSubmit, register, reset } = useForm<Omit<Transaction, 'id'>>();
+
+  const handleAddTransaction = (data: Omit<Transaction, 'id'>) => {
+    if (!financeCollection) return;
+    const amount = parseFloat(String(data.amount));
+    const newTransaction = {
+      ...data,
+      amount: data.type === 'income' ? Math.abs(amount) : -Math.abs(amount),
+      date: new Date().toISOString(),
+    };
+    addDocumentNonBlocking(collection(firestore, "users", user!.uid, "financeRecords"), newTransaction);
+    reset({ description: "", amount: 0, type: undefined });
+    setIsDialogOpen(false);
+  };
+
+  const isLoading = isUserLoading || areTransactionsLoading;
+
+  const totalIncome = transactions?.filter((t) => t.type === "income").reduce((acc, t) => acc + t.amount, 0) ?? 0;
+  const totalExpenses = transactions?.filter((t) => t.type === "expense").reduce((acc, t) => acc + t.amount, 0) ?? 0;
+  const totalTithe = transactions?.filter((t) => t.type === "tithe").reduce((acc, t) => acc + t.amount, 0) ?? 0;
   const netBalance = totalIncome + totalExpenses + totalTithe;
 
   return (
@@ -72,7 +90,7 @@ export default function FinancesPage() {
             <Button variant="outline">
                 <Landmark className="mr-2 h-4 w-4" /> Pay Tithe (M-Pesa)
             </Button>
-            <Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
                 <Button>
                 <Plus className="mr-2 h-4 w-4" /> Add Transaction
@@ -85,32 +103,41 @@ export default function FinancesPage() {
                     Log a new income, expense, or tithe payment.
                 </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Input id="description" placeholder="e.g. Groceries" />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="amount">Amount (Ksh)</Label>
-                    <Input id="amount" type="number" placeholder="e.g. 5000" />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select>
-                    <SelectTrigger id="category">
-                        <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="income">Income</SelectItem>
-                        <SelectItem value="expense">Expense</SelectItem>
-                        <SelectItem value="tithe">Tithe</SelectItem>
-                    </SelectContent>
-                    </Select>
-                </div>
-                </div>
-                <DialogFooter>
-                <Button type="submit">Save Transaction</Button>
-                </DialogFooter>
+                <form onSubmit={handleSubmit(handleAddTransaction)}>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Input id="description" placeholder="e.g. Groceries" {...register("description", { required: true })} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="amount">Amount (Ksh)</Label>
+                        <Input id="amount" type="number" placeholder="e.g. 5000" {...register("amount", { required: true, valueAsNumber: true })} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="type">Category</Label>
+                        <Controller
+                          name="type"
+                          control={control}
+                          rules={{ required: true }}
+                          render={({ field }) => (
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <SelectTrigger id="type">
+                                  <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="income">Income</SelectItem>
+                                  <SelectItem value="expense">Expense</SelectItem>
+                                  <SelectItem value="tithe">Tithe</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit">Save Transaction</Button>
+                  </DialogFooter>
+                </form>
             </DialogContent>
             </Dialog>
         </div>
@@ -123,7 +150,7 @@ export default function FinancesPage() {
             <ArrowUpCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Ksh {totalIncome.toLocaleString()}</div>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">Ksh {totalIncome.toLocaleString()}</div>}
           </CardContent>
         </Card>
         <Card>
@@ -132,7 +159,7 @@ export default function FinancesPage() {
             <ArrowDownCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Ksh {Math.abs(totalExpenses).toLocaleString()}</div>
+             {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">Ksh {Math.abs(totalExpenses).toLocaleString()}</div>}
           </CardContent>
         </Card>
         <Card>
@@ -141,9 +168,9 @@ export default function FinancesPage() {
             <Landmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+             {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className={`text-2xl font-bold ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               Ksh {netBalance.toLocaleString()}
-            </div>
+            </div>}
           </CardContent>
         </Card>
       </div>
@@ -163,13 +190,21 @@ export default function FinancesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((t) => (
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-24"/></TableCell>
+                  <TableCell><Skeleton className="h-5 w-32"/></TableCell>
+                  <TableCell><Skeleton className="h-6 w-20 rounded-full"/></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto"/></TableCell>
+                </TableRow>
+              ))}
+              {!isLoading && transactions?.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell>{t.date}</TableCell>
+                  <TableCell>{new Date(t.date).toLocaleDateString()}</TableCell>
                   <TableCell className="font-medium">{t.description}</TableCell>
                   <TableCell>
-                    <Badge variant={t.category === 'income' ? 'default' : t.category === 'tithe' ? 'secondary' : 'destructive'} className="capitalize">
-                      {t.category}
+                    <Badge variant={t.type === 'income' ? 'default' : t.type === 'tithe' ? 'secondary' : 'destructive'} className="capitalize">
+                      {t.type}
                     </Badge>
                   </TableCell>
                   <TableCell className={`text-right font-semibold ${t.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>

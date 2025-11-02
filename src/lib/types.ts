@@ -18,6 +18,6 @@ export type Transaction = {
     id: string;
     date: string;
     description: string;
-    category: 'income' | 'expense' | 'tithe';
+    type: 'income' | 'expense' | 'tithe';
     amount: number;
 };
