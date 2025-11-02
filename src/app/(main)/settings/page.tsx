@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,12 +16,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 import { Switch } from "@/components/ui/switch";
-import { useUser, useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useAuth } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { deleteUserAccount } from "./actions";
+import { useRouter } from "next/navigation";
 
 interface ProfileForm {
   name: string;
@@ -29,8 +32,11 @@ interface ProfileForm {
 
 export default function SettingsPage() {
   const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const router = useRouter();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -51,6 +57,29 @@ export default function SettingsPage() {
       description: "Your name has been successfully updated.",
     });
   };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setIsDeleting(true);
+    try {
+        await deleteUserAccount(user.uid, userProfile?.onboardingDataId);
+        toast({
+            title: "Account Deleted",
+            description: "Your account and all associated data have been permanently deleted.",
+        });
+        await auth.signOut();
+        router.push('/');
+    } catch (error) {
+        console.error("Failed to delete account:", error);
+        toast({
+            title: "Error",
+            description: "Could not delete your account. Please try again.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsDeleting(false);
+    }
+  }
 
   const isLoading = isUserLoading || isUserProfileLoading;
 
@@ -146,7 +175,29 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="destructive">Delete Account</Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isDeleting}>
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Delete Account
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete your
+                    account and remove all your data from our servers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
+                    Yes, delete my account
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </div>
