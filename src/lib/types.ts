@@ -44,3 +44,12 @@ export type Plan = {
   content: string;
   createdAt: string;
 };
+
+export type AccountabilityPartner = {
+  id: string;
+  userProfileId: string;
+  partnerEmail: string;
+  name?: string;
+  permissions: string;
+  consentLog: string;
+};
