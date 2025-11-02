@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,42 +9,46 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
-import { Plus, Repeat, Flame } from "lucide-react";
+import { Plus, Flame, Loader2 } from "lucide-react";
 import type { Habit } from "@/lib/types";
-
-const initialHabits: Habit[] = [
-  { id: "1", name: "Read 10 pages", completed: false, streak: 12 },
-  { id: "2", name: "Morning meditation", completed: true, streak: 4 },
-  { id: "3", name: "30-minute walk", completed: false, streak: 0 },
-  { id: "4", name: "Drink 8 glasses of water", completed: true, streak: 28 },
-  { id: "5", name: "Plan tomorrow", completed: false, streak: 9 },
-];
+import { useFirestore, useUser, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase";
+import { collection, doc, query, where } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function HabitsPage() {
-  const [habits, setHabits] = useState<Habit[]>(initialHabits);
+  const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
+  
+  const habitsCollection = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, "users", user.uid, "habits");
+  }, [firestore, user]);
+
+  const { data: habits, isLoading: areHabitsLoading } = useCollection<Omit<Habit, 'id'>>(habitsCollection);
+
   const [newHabitName, setNewHabitName] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const toggleHabit = (id: string) => {
-    setHabits(
-      habits.map((habit) =>
-        habit.id === id ? { ...habit, completed: !habit.completed } : habit
-      )
-    );
+  const toggleHabit = (id: string, completed: boolean) => {
+    if (!habitsCollection) return;
+    const habitDocRef = doc(habitsCollection, id);
+    updateDocumentNonBlocking(habitDocRef, { completed: !completed });
   };
 
   const handleAddHabit = () => {
-    if (newHabitName.trim() === "") return;
-    const newHabit: Habit = {
-      id: Date.now().toString(),
+    if (newHabitName.trim() === "" || !habitsCollection) return;
+    const newHabit = {
       name: newHabitName.trim(),
       completed: false,
       streak: 0,
+      createdAt: new Date().toISOString(),
     };
-    setHabits([...habits, newHabit]);
+    addDocumentNonBlocking(habitsCollection, newHabit);
     setNewHabitName("");
     setIsDialogOpen(false);
   };
+  
+  const isLoading = isUserLoading || areHabitsLoading;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-8">
@@ -76,6 +81,7 @@ export default function HabitsPage() {
                   onChange={(e) => setNewHabitName(e.target.value)}
                   className="col-span-3"
                   placeholder="e.g. Morning meditation"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddHabit()}
                 />
               </div>
             </div>
@@ -87,7 +93,20 @@ export default function HabitsPage() {
       </PageHeader>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {habits.map((habit) => (
+        {isLoading && Array.from({ length: 5 }).map((_, i) => (
+          <Card key={i} className="flex flex-col">
+            <CardHeader>
+              <Skeleton className="h-6 w-3/4" />
+            </CardHeader>
+            <CardContent className="flex-grow">
+              <Skeleton className="h-5 w-24" />
+            </CardContent>
+            <CardFooter>
+              <Skeleton className="h-10 w-full" />
+            </CardFooter>
+          </Card>
+        ))}
+        {!isLoading && habits?.map((habit) => (
           <Card key={habit.id} className="flex flex-col">
             <CardHeader>
               <CardTitle className="font-headline text-xl">{habit.name}</CardTitle>
@@ -104,7 +123,7 @@ export default function HabitsPage() {
               <Button 
                 variant={habit.completed ? "secondary" : "default"} 
                 className="w-full"
-                onClick={() => toggleHabit(habit.id)}
+                onClick={() => toggleHabit(habit.id, habit.completed)}
               >
                 <Checkbox checked={habit.completed} className="mr-2" />
                 {habit.completed ? "Completed" : "Mark as Complete"}
@@ -112,15 +131,17 @@ export default function HabitsPage() {
             </CardFooter>
           </Card>
         ))}
-         <Card className="flex items-center justify-center border-2 border-dashed">
-            <DialogTrigger asChild>
-                <button className="text-center p-6 w-full h-full">
-                    <Plus className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                    <h3 className="font-headline text-lg">Add New Habit</h3>
-                    <p className="text-sm text-muted-foreground">Start a new routine.</p>
-                </button>
-            </DialogTrigger>
-        </Card>
+         {!isLoading && (
+            <Card className="flex items-center justify-center border-2 border-dashed">
+                <DialogTrigger asChild>
+                    <button className="text-center p-6 w-full h-full" onClick={() => setIsDialogOpen(true)}>
+                        <Plus className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                        <h3 className="font-headline text-lg">Add New Habit</h3>
+                        <p className="text-sm text-muted-foreground">Start a new routine.</p>
+                    </button>
+                </DialogTrigger>
+            </Card>
+         )}
       </div>
     </div>
   );
