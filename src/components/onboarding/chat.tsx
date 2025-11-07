@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send, Bot, User, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth, initiateAnonymousSignIn, addDocumentNonBlocking, setDocumentNonBlocking, useUser } from "@/firebase";
+import { initiateAnonymousSignIn, setDocumentNonBlocking, useUser, useAuth } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { useFirestore } from "@/firebase/provider";
 
@@ -23,25 +23,27 @@ export function OnboardingChat() {
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "ai",
-      text: "Welcome to Pillar! I'm here to help you get started by building a personalized plan. To begin, what's one area of your life you're hoping to improve?",
+      text: "Welcome to Pillar! I'm here to help you get started by building a personalized plan. To begin, what's your first name?",
     },
   ]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [profile, setProfile] = useState({});
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!user) {
+    // Initiate sign-in only if there's no user and auth is ready.
+    if (!user && !isUserLoading) {
       initiateAnonymousSignIn(auth);
     }
-  }, [auth, user]);
+  }, [auth, user, isUserLoading]);
+
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -57,19 +59,19 @@ export function OnboardingChat() {
 
     const userMessage: Message = { sender: "user", text: input };
     setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
+setInput("");
+    setIsProcessing(true);
 
     try {
       const response = await interactiveOnboardingChat({
         message: input,
         profile: profile,
-        isComplete: isComplete,
       });
 
       const aiMessage: Message = { sender: "ai", text: response.response };
       setMessages((prev) => [...prev, aiMessage]);
       setProfile(response.profile);
+      
       if (response.isComplete) {
         setIsComplete(true);
         await saveOnboardingData(response.profile);
@@ -82,7 +84,7 @@ export function OnboardingChat() {
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -92,7 +94,9 @@ export function OnboardingChat() {
       // 1. Save onboarding answers
       const onboardingData = { answers: JSON.stringify(finalProfile) };
       const onboardingCol = collection(firestore, 'onboardingData');
-      const onboardingDocRef = await addDocumentNonBlocking(onboardingCol, onboardingData);
+      const onboardingDocRef = doc(onboardingCol); // Create a reference with a new ID
+      setDocumentNonBlocking(onboardingDocRef, onboardingData, {});
+
 
       // 2. Create user profile
       const userProfileRef = doc(firestore, "userProfiles", user.uid);
@@ -108,6 +112,8 @@ export function OnboardingChat() {
       console.error("Error saving onboarding data:", error);
     }
   };
+
+  const isLoading = isUserLoading || isProcessing;
 
   return (
     <div className="h-full flex flex-col max-w-4xl mx-auto w-full">
