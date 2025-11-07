@@ -120,7 +120,7 @@ export default function ManualPage() {
             return (
               <Card key={isLoading || pageIsLoading ? index : section.key}>
                 <CardHeader className="flex flex-row items-center gap-4 space-y-0">
-                  {isLoading || pageIsloading ? <Skeleton className="h-8 w-8 rounded-full" /> : section.icon}
+                  {isLoading || pageIsLoading ? <Skeleton className="h-8 w-8 rounded-full" /> : section.icon}
                   <CardTitle className="font-headline text-2xl">{isLoading || pageIsLoading ? <Skeleton className="h-6 w-32" /> : section.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
