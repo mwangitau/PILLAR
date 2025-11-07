@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser, useFirestore, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from "@/firebase";
 import { doc, collection, query, limit, orderBy } from "firebase/firestore";
 import type { UserProfile, OnboardingData, Plan } from "@/lib/types";
+import AppLayout from "@/components/layout/AppLayout";
 
 export default function ManualPage() {
   const [plan, setPlan] = useState<PersonalizedPlanOutput | null>(null);
@@ -88,56 +88,58 @@ export default function ManualPage() {
   const pageIsLoading = isUserLoading || isUserProfileLoading || isOnboardingDataLoading || arePlansLoading;
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8">
-      <PageHeader
-        title="Your Personal Manual"
-        description="AI-generated guidance tailored to your goals and profile."
-      >
-        <Button onClick={handleGeneratePlan} disabled={isLoading || pageIsLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : "Generate My Plan"}
-        </Button>
-      </PageHeader>
-      
-      {!plan && !isLoading && !pageIsLoading && (
-        <div className="flex flex-col items-center justify-center text-center py-20 border-2 border-dashed rounded-lg">
-          <Lightbulb className="h-16 w-16 text-muted-foreground mb-4" />
-          <h2 className="text-2xl font-headline font-semibold">Ready for your personalized plan?</h2>
-          <p className="text-muted-foreground mt-2 max-w-md">Click the "Generate My Plan" button to receive AI-powered advice on identity, habits, routines, and more, all tailored just for you.</p>
+    <AppLayout>
+      <div className="container mx-auto px-4 md:px-6 py-8">
+        <PageHeader
+          title="Your Personal Manual"
+          description="AI-generated guidance tailored to your goals and profile."
+        >
+          <Button onClick={handleGeneratePlan} disabled={isLoading || pageIsLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : "Generate My Plan"}
+          </Button>
+        </PageHeader>
+        
+        {!plan && !isLoading && !pageIsLoading && (
+          <div className="flex flex-col items-center justify-center text-center py-20 border-2 border-dashed rounded-lg">
+            <Lightbulb className="h-16 w-16 text-muted-foreground mb-4" />
+            <h2 className="text-2xl font-headline font-semibold">Ready for your personalized plan?</h2>
+            <p className="text-muted-foreground mt-2 max-w-md">Click the "Generate My Plan" button to receive AI-powered advice on identity, habits, routines, and more, all tailored just for you.</p>
+          </div>
+        )}
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {(isLoading || pageIsLoading ? Array(5).fill(0) : adviceSections).map((section, index) => {
+            const content = plan ? plan[section.key as keyof PersonalizedPlanOutput] : null;
+            if (!content && !(isLoading || pageIsLoading)) return null;
+
+            return (
+              <Card key={isLoading || pageIsLoading ? index : section.key}>
+                <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+                  {isLoading || pageIsLoading ? <Skeleton className="h-8 w-8 rounded-full" /> : section.icon}
+                  <CardTitle className="font-headline text-2xl">{isLoading || pageIsLoading ? <Skeleton className="h-6 w-32" /> : section.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading || pageIsLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-4/5" />
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground whitespace-pre-wrap">{content}</p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
-      )}
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {(isLoading || pageIsLoading ? Array(5).fill(0) : adviceSections).map((section, index) => {
-          const content = plan ? plan[section.key as keyof PersonalizedPlanOutput] : null;
-          if (!content && !(isLoading || pageIsLoading)) return null;
-
-          return (
-            <Card key={isLoading || pageIsLoading ? index : section.key}>
-              <CardHeader className="flex flex-row items-center gap-4 space-y-0">
-                {isLoading || pageIsLoading ? <Skeleton className="h-8 w-8 rounded-full" /> : section.icon}
-                <CardTitle className="font-headline text-2xl">{isLoading || pageIsLoading ? <Skeleton className="h-6 w-32" /> : section.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading || pageIsLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-4/5" />
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground whitespace-pre-wrap">{content}</p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -18,6 +17,7 @@ import { generateReport, type GenerateReportInput } from "@/ai/flows/generate-re
 import { downloadUserData } from "@/ai/flows/download-user-data";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import AppLayout from "@/components/layout/AppLayout";
 
 interface InvitePartnerForm {
   email: string;
@@ -119,132 +119,134 @@ export default function AccountabilityPage() {
   const isLoading = isUserLoading || partnersLoading;
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8">
-      <PageHeader
-        title="Accountability"
-        description="Share your journey and stay on track with a trusted partner."
-      />
-      
-      <div className="grid gap-8 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2">
-                <UserPlus className="h-6 w-6"/>
-                Invite a Partner
-            </CardTitle>
-            <CardDescription>
-              Add an accountability partner by entering their email address.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(handleInvitePartner)} className="flex space-x-2">
-              <Input 
-                type="email" 
-                placeholder="partner@example.com" 
-                {...register("email", { required: true })}
-              />
-              <Button type="submit">Send Invite</Button>
-            </form>
-            <p className="text-xs text-muted-foreground mt-4">
-              Your partner will only see the reports you explicitly share. You are in full control of your privacy.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2">
-                <Users className="h-6 w-6"/>
-                Your Partners
-            </CardTitle>
-            <CardDescription>
-              Manage your existing accountability partners.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading && Array.from({length: 2}).map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                    <div className="flex items-center gap-4">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-3 w-32" />
-                        </div>
-                    </div>
-                    <Skeleton className="h-8 w-20" />
-                </div>
-            ))}
-            {!isLoading && partners?.map((partner) => (
-              <div key={partner.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <Avatar>
-                    <AvatarImage src={`https://i.pravatar.cc/150?u=${partner.partnerEmail}`} alt={partner.name} />
-                    <AvatarFallback>{partner.name?.charAt(0) || 'P'}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-semibold">{partner.name}</p>
-                    <p className="text-sm text-muted-foreground">{partner.partnerEmail}</p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => handleRemovePartner(partner.id)}>
-                    <X className="h-4 w-4 mr-1"/>
-                    Remove
-                </Button>
-              </div>
-            ))}
-            {!isLoading && (!partners || partners.length === 0) && (
-                 <div className="flex items-center justify-center text-center p-3 border-2 border-dashed rounded-lg">
-                    <div className="text-center p-6">
-                        <UserPlus className="mx-auto h-6 w-6 text-muted-foreground mb-1"/>
-                        <span className="text-sm font-medium">You have no partners yet.</span>
-                        <p className="text-xs text-muted-foreground">Use the form to send an invite.</p>
-                    </div>
-                </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-8">
+    <AppLayout>
+      <div className="container mx-auto px-4 md:px-6 py-8">
+        <PageHeader
+          title="Accountability"
+          description="Share your journey and stay on track with a trusted partner."
+        />
+        
+        <div className="grid gap-8 md:grid-cols-2">
           <Card>
-              <CardHeader>
-                  <CardTitle className="font-headline flex items-center gap-2">
-                      <Share2 className="h-6 w-6"/>
-                      Share Reports
-                  </CardTitle>
-                  <CardDescription>Generate and share reports with your partners. AI summaries are generated and displayed for you to share.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button variant="outline" onClick={() => handleGenerateReport('habits', 'weekly', 'Weekly Habit Report')}>Weekly Habit Report</Button>
-                  <Button variant="outline" onClick={() => handleGenerateReport('journal', 'monthly', 'Monthly Journal Summary')}>Monthly Journal Summary</Button>
-                  <Button variant="outline" onClick={() => handleGenerateReport('finances', 'monthly', 'Financial Overview')}>Financial Overview</Button>
-                  <Button variant="outline" onClick={handleFullExport} disabled={isExporting}>
-                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                    Full Manual Export
-                  </Button>
-              </CardContent>
+            <CardHeader>
+              <CardTitle className="font-headline flex items-center gap-2">
+                  <UserPlus className="h-6 w-6"/>
+                  Invite a Partner
+              </CardTitle>
+              <CardDescription>
+                Add an accountability partner by entering their email address.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit(handleInvitePartner)} className="flex space-x-2">
+                <Input 
+                  type="email" 
+                  placeholder="partner@example.com" 
+                  {...register("email", { required: true })}
+                />
+                <Button type="submit">Send Invite</Button>
+              </form>
+              <p className="text-xs text-muted-foreground mt-4">
+                Your partner will only see the reports you explicitly share. You are in full control of your privacy.
+              </p>
+            </CardContent>
           </Card>
-      </div>
-      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-headline">{reportTitle}</DialogTitle>
-            <DialogDescription>
-              This is a preview of the report. You can copy this text to share with your accountability partner.
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh] p-4 border rounded-md">
-            {isGeneratingReport ? (
-                <div className="flex items-center justify-center h-48">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-headline flex items-center gap-2">
+                  <Users className="h-6 w-6"/>
+                  Your Partners
+              </CardTitle>
+              <CardDescription>
+                Manage your existing accountability partners.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoading && Array.from({length: 2}).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                      <div className="flex items-center gap-4">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div className="space-y-2">
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-3 w-32" />
+                          </div>
+                      </div>
+                      <Skeleton className="h-8 w-20" />
+                  </div>
+              ))}
+              {!isLoading && partners?.map((partner) => (
+                <div key={partner.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <Avatar>
+                      <AvatarImage src={`https://i.pravatar.cc/150?u=${partner.partnerEmail}`} alt={partner.name} />
+                      <AvatarFallback>{partner.name?.charAt(0) || 'P'}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">{partner.name}</p>
+                      <p className="text-sm text-muted-foreground">{partner.partnerEmail}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => handleRemovePartner(partner.id)}>
+                      <X className="h-4 w-4 mr-1"/>
+                      Remove
+                  </Button>
                 </div>
-            ) : (
-                <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: reportContent.replace(/\n/g, '<br />') }} />
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-    </div>
+              ))}
+              {!isLoading && (!partners || partners.length === 0) && (
+                   <div className="flex items-center justify-center text-center p-3 border-2 border-dashed rounded-lg">
+                      <div className="text-center p-6">
+                          <UserPlus className="mx-auto h-6 w-6 text-muted-foreground mb-1"/>
+                          <span className="text-sm font-medium">You have no partners yet.</span>
+                          <p className="text-xs text-muted-foreground">Use the form to send an invite.</p>
+                      </div>
+                  </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mt-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline flex items-center gap-2">
+                        <Share2 className="h-6 w-6"/>
+                        Share Reports
+                    </CardTitle>
+                    <CardDescription>Generate and share reports with your partners. AI summaries are generated and displayed for you to share.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <Button variant="outline" onClick={() => handleGenerateReport('habits', 'weekly', 'Weekly Habit Report')}>Weekly Habit Report</Button>
+                    <Button variant="outline" onClick={() => handleGenerateReport('journal', 'monthly', 'Monthly Journal Summary')}>Monthly Journal Summary</Button>
+                    <Button variant="outline" onClick={() => handleGenerateReport('finances', 'monthly', 'Financial Overview')}>Financial Overview</Button>
+                    <Button variant="outline" onClick={handleFullExport} disabled={isExporting}>
+                      {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                      Full Manual Export
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+        <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-headline">{reportTitle}</DialogTitle>
+              <DialogDescription>
+                This is a preview of the report. You can copy this text to share with your accountability partner.
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] p-4 border rounded-md">
+              {isGeneratingReport ? (
+                  <div className="flex items-center justify-center h-48">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+                  </div>
+              ) : (
+                  <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: reportContent.replace(/\n/g, '<br />') }} />
+              )}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AppLayout>
   );
 }
 

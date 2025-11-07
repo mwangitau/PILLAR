@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -25,6 +24,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { deleteUserAccount } from "@/app/settings/actions";
 import { useRouter } from "next/navigation";
+import AppLayout from "@/components/layout/AppLayout";
 
 interface ProfileForm {
   name: string;
@@ -107,139 +107,141 @@ export default function SettingsPage() {
   const isLoading = isUserLoading || isUserProfileLoading;
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8">
-      <PageHeader
-        title="Settings"
-        description="Manage your account and preferences."
-      />
-      <div className="grid gap-8">
-        <Card>
-          <form onSubmit={handleSubmit(handleUpdateProfile)}>
+    <AppLayout>
+      <div className="container mx-auto px-4 md:px-6 py-8">
+        <PageHeader
+          title="Settings"
+          description="Manage your account and preferences."
+        />
+        <div className="grid gap-8">
+          <Card>
+            <form onSubmit={handleSubmit(handleUpdateProfile)}>
+              <CardHeader>
+                <CardTitle className="font-headline">Profile</CardTitle>
+                <CardDescription>
+                  This is how others will see you on the site.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isLoading ? (
+                  <>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-12" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-12" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Name</Label>
+                      <Input id="name" {...register("name", { required: true })} disabled={isSavingProfile}/>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" type="email" value={userProfile?.email || ''} readOnly disabled />
+                    </div>
+                  </>
+                )}
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" disabled={isLoading || isSavingProfile}>
+                  {isSavingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Profile
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+
+          <Card>
             <CardHeader>
-              <CardTitle className="font-headline">Profile</CardTitle>
+              <CardTitle className="font-headline">Notifications</CardTitle>
               <CardDescription>
-                This is how others will see you on the site.
+                Configure how you receive notifications.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoading ? (
-                <>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-12" />
-                    <Skeleton className="h-10 w-full" />
+            <CardContent className="space-y-6">
+              { isLoading ? Array.from({length: 3}).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                      <div className="flex-1">
+                          <Skeleton className="h-5 w-32 mb-2"/>
+                          <Skeleton className="h-4 w-4/5"/>
+                      </div>
+                      <Skeleton className="h-6 w-11 rounded-full"/>
                   </div>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-12" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input id="name" {...register("name", { required: true })} disabled={isSavingProfile}/>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={userProfile?.email || ''} readOnly disabled />
-                  </div>
-                </>
+              )) : (
+                  <>
+                      <div className="flex items-center justify-between">
+                          <div>
+                              <Label htmlFor="reminders" className="font-medium">Habit Reminders</Label>
+                              <p className="text-sm text-muted-foreground">Receive push notifications to complete your habits.</p>
+                          </div>
+                          <Switch id="reminders" checked={prefs.habitReminders} onCheckedChange={(checked) => setPrefs(p => ({...p, habitReminders: checked}))} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                          <div>
+                              <Label htmlFor="weekly-summary" className="font-medium">Weekly Summary</Label>
+                              <p className="text-sm text-muted-foreground">Get a weekly email with your progress summary.</p>
+                          </div>
+                          <Switch id="weekly-summary" checked={prefs.weeklySummary} onCheckedChange={(checked) => setPrefs(p => ({...p, weeklySummary: checked}))} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                          <div>
+                              <Label htmlFor="partner-updates" className="font-medium">Partner Updates</Label>
+                              <p className="text-sm text-muted-foreground">Notify me when an accountability partner checks my report.</p>
+                          </div>
+                          <Switch id="partner-updates" checked={prefs.partnerUpdates} onCheckedChange={(checked) => setPrefs(p => ({...p, partnerUpdates: checked}))} />
+                      </div>
+                  </>
               )}
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isLoading || isSavingProfile}>
-                {isSavingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Profile
+              <Button onClick={handleSavePreferences} disabled={isLoading || isSavingPrefs}>
+                  {isSavingPrefs && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Preferences
               </Button>
             </CardFooter>
-          </form>
-        </Card>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">Notifications</CardTitle>
-            <CardDescription>
-              Configure how you receive notifications.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            { isLoading ? Array.from({length: 3}).map((_, i) => (
-                <div key={i} className="flex items-center justify-between">
-                    <div className="flex-1">
-                        <Skeleton className="h-5 w-32 mb-2"/>
-                        <Skeleton className="h-4 w-4/5"/>
-                    </div>
-                    <Skeleton className="h-6 w-11 rounded-full"/>
-                </div>
-            )) : (
-                <>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Label htmlFor="reminders" className="font-medium">Habit Reminders</Label>
-                            <p className="text-sm text-muted-foreground">Receive push notifications to complete your habits.</p>
-                        </div>
-                        <Switch id="reminders" checked={prefs.habitReminders} onCheckedChange={(checked) => setPrefs(p => ({...p, habitReminders: checked}))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Label htmlFor="weekly-summary" className="font-medium">Weekly Summary</Label>
-                            <p className="text-sm text-muted-foreground">Get a weekly email with your progress summary.</p>
-                        </div>
-                        <Switch id="weekly-summary" checked={prefs.weeklySummary} onCheckedChange={(checked) => setPrefs(p => ({...p, weeklySummary: checked}))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Label htmlFor="partner-updates" className="font-medium">Partner Updates</Label>
-                            <p className="text-sm text-muted-foreground">Notify me when an accountability partner checks my report.</p>
-                        </div>
-                        <Switch id="partner-updates" checked={prefs.partnerUpdates} onCheckedChange={(checked) => setPrefs(p => ({...p, partnerUpdates: checked}))} />
-                    </div>
-                </>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button onClick={handleSavePreferences} disabled={isLoading || isSavingPrefs}>
-                {isSavingPrefs && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Preferences
-            </Button>
-          </CardFooter>
-        </Card>
-
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="font-headline text-destructive">Danger Zone</CardTitle>
-            <CardDescription>
-              These actions are irreversible. Please be certain.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isDeleting}>
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                    Delete Account
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your
-                    account and remove all your data from our servers.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
-                    Yes, delete my account
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </CardContent>
-        </Card>
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="font-headline text-destructive">Danger Zone</CardTitle>
+              <CardDescription>
+                These actions are irreversible. Please be certain.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={isDeleting}>
+                      {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                      Delete Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete your
+                      account and remove all your data from our servers.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
+                      Yes, delete my account
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }
 
