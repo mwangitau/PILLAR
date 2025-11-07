@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser, useFirestore, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from "@/firebase";
 import { doc, collection, query, limit, orderBy } from "firebase/firestore";
 import type { UserProfile, OnboardingData, Plan } from "@/lib/types";
+import { AppSidebar } from "@/components/layout/sidebar";
 
 export default function ManualPage() {
   const [plan, setPlan] = useState<PersonalizedPlanOutput | null>(null);
@@ -88,6 +89,9 @@ export default function ManualPage() {
   const pageIsLoading = isUserLoading || isUserProfileLoading || isOnboardingDataLoading || arePlansLoading;
 
   return (
+    <div className="flex h-screen">
+    <AppSidebar />
+    <main className="flex-1 overflow-y-auto">
     <div className="container mx-auto px-4 md:px-6 py-8">
       <PageHeader
         title="Your Personal Manual"
@@ -137,6 +141,8 @@ export default function ManualPage() {
           );
         })}
       </div>
+    </div>
+    </main>
     </div>
   );
 }

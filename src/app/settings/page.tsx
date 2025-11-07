@@ -25,6 +25,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { deleteUserAccount } from "./actions";
 import { useRouter } from "next/navigation";
+import { AppSidebar } from "@/components/layout/sidebar";
 
 interface ProfileForm {
   name: string;
@@ -105,6 +106,9 @@ export default function SettingsPage() {
   const isLoading = isUserLoading || isUserProfileLoading;
 
   return (
+    <div className="flex h-screen">
+    <AppSidebar />
+    <main className="flex-1 overflow-y-auto">
     <div className="container mx-auto px-4 md:px-6 py-8">
       <PageHeader
         title="Settings"
@@ -237,6 +241,8 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
+    </main>
     </div>
   );
 }

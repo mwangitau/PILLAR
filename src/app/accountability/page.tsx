@@ -18,6 +18,7 @@ import { generateReport, type GenerateReportInput } from "@/ai/flows/generate-re
 import { downloadUserData } from "@/ai/flows/download-user-data";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppSidebar } from "@/components/layout/sidebar";
 
 interface InvitePartnerForm {
   email: string;
@@ -119,6 +120,9 @@ export default function AccountabilityPage() {
   const isLoading = isUserLoading || partnersLoading;
 
   return (
+    <div className="flex h-screen">
+    <AppSidebar />
+    <main className="flex-1 overflow-y-auto">
     <div className="container mx-auto px-4 md:px-6 py-8">
       <PageHeader
         title="Accountability"
@@ -244,6 +248,8 @@ export default function AccountabilityPage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+    </div>
+    </main>
     </div>
   );
 }
