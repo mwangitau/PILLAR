@@ -1,7 +1,7 @@
 
 import { AppSidebar } from "@/components/layout/sidebar";
 
-export default function MainAppLayout({
+export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -13,3 +13,5 @@ export default function MainAppLayout({
       </div>
   );
 }
+
+    

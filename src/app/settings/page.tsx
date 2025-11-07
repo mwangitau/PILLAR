@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { deleteUserAccount } from "./actions";
+import { deleteUserAccount } from "@/app/settings/actions";
 import { useRouter } from "next/navigation";
 
 interface ProfileForm {
@@ -242,3 +242,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
