@@ -12,18 +12,19 @@ export type Habit = {
 export type JournalEntry = {
   id:string;
   userProfileId: string;
-  date: string;
+  createdAt: string;
   content: string;
   analysis: JournalAnalysisOutput | null;
 };
 
-export type Transaction = {
+export type FinanceRecord = {
     id: string;
     userProfileId: string;
     date: string;
     description: string;
     type: 'income' | 'expense' | 'tithe';
     amount: number;
+    category: string;
 };
 
 export type UserProfile = {

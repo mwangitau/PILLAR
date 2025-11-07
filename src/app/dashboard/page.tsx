@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import { placeholderImages } from "@/lib/placeholder-images";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc } from "firebase/firestore";
-import type { Habit, JournalEntry, Transaction, UserProfile } from "@/lib/types";
+import type { Habit, JournalEntry, FinanceRecord, UserProfile } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo, useEffect } from "react";
 import { format } from "date-fns";
@@ -40,7 +40,7 @@ export default function Dashboard() {
   useEffect(() => {
     // If user is loaded and they don't have a profile (which means onboarding isn't complete)
     // redirect them to the start page.
-    if (!isUserLoading && !isUserProfileLoading && user && !userProfile) {
+    if (!isUserLoading && user && !userProfile) {
       router.push('/start');
     }
   }, [user, userProfile, isUserLoading, isUserProfileLoading, router]);
@@ -50,7 +50,7 @@ export default function Dashboard() {
     user ? query(collection(firestore, `users/${user.uid}/habits`), orderBy("createdAt", "desc")) : null
   , [user, firestore]);
   const journalQuery = useMemoFirebase(() => 
-    user ? query(collection(firestore, `users/${user.uid}/journalEntries`), orderBy("date", "desc"), limit(5)) : null
+    user ? query(collection(firestore, `users/${user.uid}/journalEntries`), orderBy("createdAt", "desc"), limit(5)) : null
   , [user, firestore]);
   const financesQuery = useMemoFirebase(() => 
     user ? query(collection(firestore, `users/${user.uid}/financeRecords`), orderBy("date", "desc"), limit(5)) : null
@@ -58,7 +58,7 @@ export default function Dashboard() {
 
   const { data: habits, isLoading: habitsLoading } = useCollection<Habit>(habitsQuery);
   const { data: journalEntries, isLoading: journalLoading } = useCollection<JournalEntry>(journalQuery);
-  const { data: transactions, isLoading: financesLoading } = useCollection<Transaction>(financesQuery);
+  const { data: transactions, isLoading: financesLoading } = useCollection<FinanceRecord>(financesQuery);
 
   const dashboardImage = placeholderImages.find(p => p.id === 'dashboard-hero');
   const isLoading = isUserLoading || habitsLoading || journalLoading || financesLoading || isUserProfileLoading;
@@ -79,17 +79,17 @@ export default function Dashboard() {
   const recentActivities = useMemo(() => {
     const activities = [
       ...(habits || []).map(h => ({ type: 'habit', data: h, date: new Date(h.createdAt) })),
-      ...(journalEntries || []).map(j => ({ type: 'journal', data: j, date: new Date(j.date) })),
+      ...(journalEntries || []).map(j => ({ type: 'journal', data: j, date: new Date(j.createdAt) })),
       ...(transactions || []).map(t => ({ type: 'finance', data: t, date: new Date(t.date) }))
     ];
     return activities.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 4);
   }, [habits, journalEntries, transactions]);
 
   // Don't render anything if we're still checking auth or about to redirect.
-  if (isUserLoading || isUserProfileLoading || (user && !userProfile)) {
+  if (isUserLoading || (user && !userProfile)) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
-            <Skeleton className="h-16 w-16 rounded-full animate-pulse" />
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
         </div>
     );
   }
@@ -259,13 +259,13 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div className="ml-auto font-medium text-xs">
-                        {format(new Date(journal.date), 'P')}
+                        {format(new Date(journal.createdAt), 'P')}
                     </div>
                   </div>
                 );
               }
               if (activity.type === 'finance') {
-                const transaction = activity.data as Transaction;
+                const transaction = activity.data as FinanceRecord;
                 return (
                   <div key={i} className="flex items-center gap-4">
                     <Landmark className="h-8 w-8 text-muted-foreground" />

@@ -21,10 +21,10 @@ export default function JournalPage() {
 
   const journalCollection = useMemoFirebase(() => {
     if (!user) return null;
-    return query(collection(firestore, "users", user.uid, "journalEntries"), orderBy("date", "desc"));
+    return query(collection(firestore, "users", user.uid, "journalEntries"), orderBy("createdAt", "desc"));
   }, [firestore, user]);
 
-  const { data: entries, isLoading: areEntriesLoading } = useCollection<Omit<JournalEntry, 'id'>>(journalCollection);
+  const { data: entries, isLoading: areEntriesLoading } = useCollection<JournalEntry>(journalCollection);
 
   const [newEntryContent, setNewEntryContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -37,9 +37,9 @@ export default function JournalPage() {
     try {
       const analysis: JournalAnalysisOutput = await analyzeJournalEntry({ journalEntry: newEntryContent });
       
-      const newEntry = {
+      const newEntry: Omit<JournalEntry, 'id'> = {
         userProfileId: user.uid,
-        date: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         content: newEntryContent,
         analysis,
       };
@@ -129,7 +129,7 @@ export default function JournalPage() {
             <Card key={entry.id}>
               <CardHeader>
                 <CardTitle className="text-lg">
-                  {new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {new Date(entry.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -153,5 +153,3 @@ export default function JournalPage() {
     </div>
   );
 }
-
-    

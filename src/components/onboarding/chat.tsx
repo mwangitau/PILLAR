@@ -50,7 +50,7 @@ export function OnboardingChat() {
 
     const userMessage: Message = { sender: "user", text: input };
     setMessages((prev) => [...prev, userMessage]);
-setInput("");
+    setInput("");
     setIsProcessing(true);
 
     try {

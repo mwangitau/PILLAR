@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDownCircle, ArrowUpCircle, Plus, Landmark, Loader2 } from "lucide-react";
-import type { Transaction } from "@/lib/types";
+import type { FinanceRecord } from "@/lib/types";
 import { useFirestore, useUser, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,26 +57,26 @@ export default function FinancesPage() {
     return query(collection(firestore, "users", user.uid, "financeRecords"), orderBy("date", "desc"));
   }, [firestore, user]);
 
-  const { data: transactions, isLoading: areTransactionsLoading } = useCollection<Transaction>(financeCollection);
+  const { data: transactions, isLoading: areTransactionsLoading } = useCollection<FinanceRecord>(financeCollection);
   
   const [isAddTxDialogOpen, setIsAddTxDialogOpen] = useState(false);
   const [isTitheDialogOpen, setIsTitheDialogOpen] = useState(false);
   const [isTithing, setIsTithing] = useState(false);
   const [titheAmount, setTitheAmount] = useState<number | string>("");
   
-  const { control, handleSubmit, register, reset } = useForm<Omit<Transaction, 'id'>>();
+  const { control, handleSubmit, register, reset } = useForm<Omit<FinanceRecord, 'id' | 'userProfileId' | 'date'>>();
 
-  const handleAddTransaction = (data: Omit<Transaction, 'id'>) => {
+  const handleAddTransaction = (data: Omit<FinanceRecord, 'id' | 'userProfileId' | 'date'>) => {
     if (!user) return;
     const amount = parseFloat(String(data.amount));
-    const newTransaction = {
+    const newTransaction: Omit<FinanceRecord, 'id'> = {
       ...data,
       amount: data.type === 'income' ? Math.abs(amount) : -Math.abs(amount),
       date: new Date().toISOString(),
       userProfileId: user.uid,
     };
     addDocumentNonBlocking(collection(firestore, "users", user.uid, "financeRecords"), newTransaction);
-    reset({ description: "", amount: 0, type: undefined });
+    reset({ description: "", amount: 0, type: 'income', category: '' });
     setIsAddTxDialogOpen(false);
   };
   
@@ -172,11 +172,15 @@ export default function FinancesPage() {
                           <Input id="description" placeholder="e.g. Groceries" {...register("description", { required: true })} />
                       </div>
                       <div className="grid gap-2">
+                          <Label htmlFor="category">Category</Label>
+                          <Input id="category" placeholder="e.g. Food" {...register("category", { required: true })} />
+                      </div>
+                      <div className="grid gap-2">
                           <Label htmlFor="amount">Amount (Ksh)</Label>
                           <Input id="amount" type="number" placeholder="e.g. 5000" {...register("amount", { required: true, valueAsNumber: true })} />
                       </div>
                       <div className="grid gap-2">
-                          <Label htmlFor="type">Category</Label>
+                          <Label htmlFor="type">Type</Label>
                           <Controller
                             name="type"
                             control={control}
@@ -184,7 +188,7 @@ export default function FinancesPage() {
                             render={({ field }) => (
                               <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <SelectTrigger id="type">
-                                    <SelectValue placeholder="Select category" />
+                                    <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="income">Income</SelectItem>
@@ -289,5 +293,3 @@ export default function FinancesPage() {
     </div>
   );
 }
-
-    
