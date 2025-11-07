@@ -1,3 +1,4 @@
+
 import { OnboardingChat } from "@/components/onboarding/chat";
 import { PillarLogo } from "@/components/icons/logo";
 

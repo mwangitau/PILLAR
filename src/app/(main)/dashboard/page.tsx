@@ -21,16 +21,30 @@ import {
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { placeholderImages } from "@/lib/placeholder-images";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
-import type { Habit, JournalEntry, Transaction } from "@/lib/types";
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
+import { collection, query, orderBy, limit, doc } from "firebase/firestore";
+import type { Habit, JournalEntry, Transaction, UserProfile } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { format } from "date-fns";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const router = useRouter();
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  useEffect(() => {
+    // If user is loaded and they don't have a profile (which means onboarding isn't complete)
+    // redirect them to the start page.
+    if (!isUserLoading && !isUserProfileLoading && user && !userProfile) {
+      router.push('/start');
+    }
+  }, [user, userProfile, isUserLoading, isUserProfileLoading, router]);
+
 
   const habitsQuery = useMemoFirebase(() => 
     user ? query(collection(firestore, `users/${user.uid}/habits`), orderBy("createdAt", "desc")) : null
@@ -47,7 +61,7 @@ export default function Dashboard() {
   const { data: transactions, isLoading: financesLoading } = useCollection<Transaction>(financesQuery);
 
   const dashboardImage = placeholderImages.find(p => p.id === 'dashboard-hero');
-  const isLoading = isUserLoading || habitsLoading || journalLoading || financesLoading;
+  const isLoading = isUserLoading || habitsLoading || journalLoading || financesLoading || isUserProfileLoading;
 
   const { habitProgress, habitStreak } = useMemo(() => {
     if (!habits) return { habitProgress: 0, habitStreak: 0 };
@@ -71,10 +85,19 @@ export default function Dashboard() {
     return activities.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 4);
   }, [habits, journalEntries, transactions]);
 
+  // Don't render anything if we're still checking auth or about to redirect.
+  if (isUserLoading || isUserProfileLoading || !userProfile) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Skeleton className="h-16 w-16 rounded-full animate-pulse" />
+        </div>
+    );
+  }
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <PageHeader
-        title="Welcome Back!"
+        title={`Welcome Back, ${userProfile?.name || 'User'}!`}
         description="Here's a snapshot of your journey with Pillar."
       />
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

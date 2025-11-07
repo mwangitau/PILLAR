@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send, Bot, User, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { initiateAnonymousSignIn, setDocumentNonBlocking, useUser, useAuth } from "@/firebase";
+import { setDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { useFirestore } from "@/firebase/provider";
 
@@ -21,7 +21,6 @@ type Message = {
 
 export function OnboardingChat() {
   const router = useRouter();
-  const auth = useAuth();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [messages, setMessages] = useState<Message[]>([
@@ -36,14 +35,6 @@ export function OnboardingChat() {
   const [profile, setProfile] = useState({});
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Initiate sign-in only if there's no user and auth is ready.
-    if (!user && !isUserLoading) {
-      initiateAnonymousSignIn(auth);
-    }
-  }, [auth, user, isUserLoading]);
-
 
   useEffect(() => {
     if (scrollAreaRef.current) {

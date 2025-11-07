@@ -16,7 +16,7 @@ export default function Home() {
           <span className="font-headline text-2xl font-bold">Pillar</span>
         </Link>
         <Button asChild variant="ghost">
-          <Link href="/onboarding">
+          <Link href="/login">
             Log In
           </Link>
         </Button>
@@ -36,7 +36,7 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button asChild size="lg" className="group">
-                    <Link href="/onboarding">
+                    <Link href="/login">
                       Get Started
                       <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </Link>
