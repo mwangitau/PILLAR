@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { useFirestore, useUser, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase";
 import { collection, orderBy, query } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AppSidebar } from "@/components/layout/sidebar";
 
 export default function JournalPage() {
   const firestore = useFirestore();
@@ -32,13 +31,14 @@ export default function JournalPage() {
   const { toast } = useToast();
 
   const handleSaveEntry = async () => {
-    if (newEntryContent.trim() === "" || !journalCollection) return;
+    if (newEntryContent.trim() === "" || !journalCollection || !user) return;
     setIsAnalyzing(true);
 
     try {
       const analysis: JournalAnalysisOutput = await analyzeJournalEntry({ journalEntry: newEntryContent });
       
       const newEntry = {
+        userProfileId: user.uid,
         date: new Date().toISOString(),
         content: newEntryContent,
         analysis,
@@ -66,9 +66,6 @@ export default function JournalPage() {
   const isLoading = isUserLoading || areEntriesLoading;
 
   return (
-    <div className="flex h-screen">
-    <AppSidebar />
-    <main className="flex-1 overflow-y-auto">
     <div className="container mx-auto px-4 md:px-6 py-8">
       <PageHeader
         title="AI-Driven Journaling"
@@ -153,8 +150,6 @@ export default function JournalPage() {
           ))}
         </div>
       </div>
-    </div>
-    </main>
     </div>
   );
 }

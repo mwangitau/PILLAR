@@ -14,7 +14,6 @@ import type { Habit } from "@/lib/types";
 import { useFirestore, useUser, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AppSidebar } from "@/components/layout/sidebar";
 
 export default function HabitsPage() {
   const firestore = useFirestore();
@@ -37,12 +36,13 @@ export default function HabitsPage() {
   };
 
   const handleAddHabit = () => {
-    if (newHabitName.trim() === "" || !habitsCollection) return;
+    if (newHabitName.trim() === "" || !habitsCollection || !user) return;
     const newHabit = {
       name: newHabitName.trim(),
       completed: false,
       streak: 0,
       createdAt: new Date().toISOString(),
+      userProfileId: user.uid,
     };
     addDocumentNonBlocking(habitsCollection, newHabit);
     setNewHabitName("");
@@ -52,9 +52,6 @@ export default function HabitsPage() {
   const isLoading = isUserLoading || areHabitsLoading;
 
   return (
-    <div className="flex h-screen">
-    <AppSidebar />
-    <main className="flex-1 overflow-y-auto">
     <div className="container mx-auto px-4 md:px-6 py-8">
       <PageHeader
         title="Habit & Routine Management"
@@ -147,8 +144,6 @@ export default function HabitsPage() {
             </Card>
          )}
       </div>
-    </div>
-    </main>
     </div>
   );
 }

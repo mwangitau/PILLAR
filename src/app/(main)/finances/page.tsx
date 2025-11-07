@@ -46,7 +46,6 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { initiateTithePayment } from "@/ai/flows/initiate-tithe-payment";
-import { AppSidebar } from "@/components/layout/sidebar";
 
 export default function FinancesPage() {
   const { user, isUserLoading } = useUser();
@@ -112,9 +111,6 @@ export default function FinancesPage() {
   const netBalance = totalIncome + totalExpenses + totalTithe;
 
   return (
-    <div className="flex h-screen">
-    <AppSidebar />
-    <main className="flex-1 overflow-y-auto">
     <div className="container mx-auto px-4 md:px-6 py-8">
       <PageHeader
         title="Finance Tracker"
@@ -290,8 +286,6 @@ export default function FinancesPage() {
           </Table>
         </CardContent>
       </Card>
-    </div>
-    </main>
     </div>
   );
 }

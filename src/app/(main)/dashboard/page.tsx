@@ -86,7 +86,7 @@ export default function Dashboard() {
   }, [habits, journalEntries, transactions]);
 
   // Don't render anything if we're still checking auth or about to redirect.
-  if (isUserLoading || isUserProfileLoading || !userProfile) {
+  if (isUserLoading || isUserProfileLoading || (user && !userProfile)) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Skeleton className="h-16 w-16 rounded-full animate-pulse" />
@@ -288,3 +288,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
