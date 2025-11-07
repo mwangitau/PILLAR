@@ -52,6 +52,7 @@ export function AppSidebar() {
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const handleLogout = async () => {
+    if (!auth) return;
     await signOut(auth);
     router.push('/');
   };
@@ -120,7 +121,7 @@ export function AppSidebar() {
                 <>
                     <Avatar>
                       <AvatarImage src={`https://i.pravatar.cc/150?u=${userProfile?.email}`} />
-                      <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
+                      <AvatarFallback>{userProfile?.name?.charAt(0) || 'P'}</AvatarFallback>
                     </Avatar>
                     <div className="overflow-hidden">
                         <p className="font-semibold text-sm truncate">{userProfile?.name || "User"}</p>
