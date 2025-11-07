@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -52,12 +53,12 @@ const prompt = ai.definePrompt({
   The current user profile is: {{{profile}}}
   The user has sent the following message: {{{message}}}
 
-  {% if isComplete %} The user onboarding process is complete.
-  {% else %} The user onboarding process is not complete.
+  {{#if isComplete}} The user onboarding process is complete.
+  {{else}} The user onboarding process is not complete.
   Please ask one question that can help you to complete the user profile. 
   Once you have enough information to onboard the user, set isComplete to true. 
   Return the updated profile and your response to the user. 
-  {% endif %}
+  {{/if}}
   `,
 });
 
