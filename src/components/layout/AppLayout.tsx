@@ -1,4 +1,3 @@
-
 import { AppSidebar } from "@/components/layout/sidebar";
 
 export default function AppLayout({

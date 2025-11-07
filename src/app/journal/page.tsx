@@ -131,7 +131,7 @@ export default function JournalPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">
                     {new Date(entry.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </CardTitle>
+                  </Title>
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground whitespace-pre-wrap">{entry.content}</p>
@@ -155,5 +155,3 @@ export default function JournalPage() {
     </AppLayout>
   );
 }
-
-    
