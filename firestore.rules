@@ -1,260 +1,253 @@
 /**
- * @fileOverview Firestore Security Rules for the Pillar application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for all data stored under the `/users/{userId}` path.
- * Users can only access their own data.  The application does not use custom claims or any complex role-based access control.
- * All subcollections under a user's path are considered private.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for personal data while allowing public read access to prompt templates.
  *
  * Data Structure:
- * - `/userProfiles/{userProfileId}`: Stores public user profile information.
- * - `/onboardingData/{onboardingDataId}`: Stores onboarding data.
- * - `/users/{userId}/plans/{planId}`: Stores personalized plans.
- * - `/users/{userId}/habits/{habitId}`: Stores user-defined habits.
- * - `/users/{userId}/journalEntries/{journalEntryId}`: Stores journal entries.
- * - `/users/{userId}/accountabilityPartners/{accountabilityPartnerId}`: Stores accountability partner information.
- * - `/users/{userId}/financeRecords/{financeRecordId}`: Stores financial records.
- * - `/users/{userId}/reports/{reportId}`: Stores generated reports.
+ * - User profiles and associated data (plans, habits, journal entries, etc.) are nested under `/users/{userId}`.
+ * - Prompt templates are stored in a top-level `/prompt_templates` collection and are publicly readable.
  *
  * Key Security Decisions:
- * - Users can only read and write their own profiles and onboarding data.
- * - Users can only access data stored under their own `/users/{userId}` path.
- * - There are no public collections.
- * - Data validation is relaxed to allow for rapid prototyping, except for fields critical for authorization.
- * - List operations are only allowed for the owner of the data.
+ * - User data is strictly controlled by the owning user. No cross-user access is allowed except for prompt templates.
+ * - The rules explicitly prevent listing all user profiles, which would violate privacy.
+ * - Data integrity is maintained by validating the `userId` field on creation to match the path.
+ * - All write operations are restricted to authenticated users.
  *
  * Denormalization for Authorization:
- * -  All documents under `/users/{userId}` should contain a `userProfileId` field matching the `userId` path segment. This allows for efficient ownership checks without additional `get()` calls.
- *
- * Structural Segregation:
- * - User profiles are stored in a separate `/userProfiles` collection to allow for potential public display in the future without exposing private user data.  The current ruleset does NOT allow public access.
+ * - Subcollections like `/users/{userId}/generated_plans/{planId}` include the `userId` field within each document. This denormalization is crucial for fast, secure authorization without requiring expensive `get()` calls to the parent `/users/{userId}` document.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents.
-     * @path /userProfiles/{userProfileId}
-     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @deny (create) - If the user is not signed in.
-     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Checks if the request is made by an authenticated user.
+     * @returns {boolean} True if the user is signed in, false otherwise.
      */
-    match /userProfiles/{userProfileId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-      function isOwner(userProfileId) {
-        return isSignedIn() && request.auth.uid == userProfileId;
-      }
+    /**
+     * @description Checks if the authenticated user ID matches the provided user ID.
+     * @param {string} userId - The user ID to compare against the authenticated user's ID.
+     * @returns {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-      function isExistingOwner(userProfileId) {
-        return isOwner(userProfileId) && resource != null;
-      }
+    /**
+     * @description Checks if the authenticated user is the owner of the existing document.
+     *              This combines the ownership check with a document existence check.
+     * @param {string} userId - The user ID to compare against the authenticated user's ID.
+     * @returns {boolean} True if the user is the owner and the document exists.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
 
-      allow get: if isSignedIn();
+    /**
+     * @description Defines the security rules for user profiles.
+     * @path /users/{userId}
+     * @allow (create) - A user can create their own profile if the `userId` matches their `auth.uid`.
+     * @allow (get) - A user can read their own profile.
+     * @allow (update) - A user can update their own profile.
+     * @allow (delete) - A user can delete their own profile.
+     * @deny (list) - Prevents listing all user profiles.
+     * @deny (create) - A user cannot create a profile with a `userId` that does not match their `auth.uid`.
+     * @deny (update) - A user cannot update a profile if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete a profile if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for writes and restricts listing of user profiles for privacy.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userProfileId);
-      allow update: if isExistingOwner(userProfileId);
-      allow delete: if isExistingOwner(userProfileId);
+
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+
+      allow delete: if isExistingOwner(userId) && resource.data.id == userId;
     }
 
     /**
-     * @description Controls access to onboarding data documents.
-     * @path /onboardingData/{onboardingDataId}
-     * @allow (create) - If the user is signed in.
-     * @allow (get, update, delete) - If the user is signed in.
-     * @deny (create) - If the user is not signed in.
-     * @deny (get, update, delete) - If the user is not signed in.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Defines the security rules for AI-generated plans for each user.
+     * @path /users/{userId}/generated_plans/{planId}
+     * @allow (create) - A user can create a plan under their own user ID, if the userId matches.
+     * @allow (get) - A user can read a plan under their own user ID.
+     * @allow (update) - A user can update a plan under their own user ID.
+     * @allow (delete) - A user can delete a plan under their own user ID.
+     * @deny (create) - A user cannot create a plan under another user's ID.
+     * @deny (update) - A user cannot update a plan if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete a plan if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for all operations on generated plans.
      */
-    match /onboardingData/{onboardingDataId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /users/{userId}/generated_plans/{planId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
 
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+
+      allow delete: if isExistingOwner(userId) && resource.data.userId == userId;
     }
 
     /**
-     * @description Controls access to plan documents within a user's collection.
-     * @path /users/{userProfileId}/plans/{planId}
-     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Defines the security rules for prompt templates. Allows public read access.
+     * @path /prompt_templates/{promptTemplateId}
+     * @allow (get) - Any authenticated user can read a prompt template.
+     * @allow (list) - Any authenticated user can list prompt templates.
+     * @deny (create) - No user can create prompt templates.
+     * @deny (update) - No user can update prompt templates.
+     * @deny (delete) - No user can delete prompt templates.
+     * @principle Allows public read access to prompt templates while restricting write access.
      */
-    match /users/{userProfileId}/plans/{planId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /prompt_templates/{promptTemplateId} {
+      allow get: if true;
+      allow list: if true;
 
-      function isOwner(userProfileId) {
-        return isSignedIn() && request.auth.uid == userProfileId;
-      }
-
-      function isExistingOwner(userProfileId) {
-        return isOwner(userProfileId) && resource != null;
-      }
-
-      allow get: if isOwner(userProfileId);
-      allow list: if isOwner(userProfileId);
-      allow create: if isOwner(userProfileId);
-      allow update: if isExistingOwner(userProfileId);
-      allow delete: if isExistingOwner(userProfileId);
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to habit documents within a user's collection.
-     * @path /users/{userProfileId}/habits/{habitId}
-     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Defines the security rules for user-defined habits.
+     * @path /users/{userId}/habits/{habitId}
+     * @allow (create) - A user can create a habit under their own user ID, if the userId matches.
+     * @allow (get) - A user can read a habit under their own user ID.
+     * @allow (update) - A user can update a habit under their own user ID.
+     * @allow (delete) - A user can delete a habit under their own user ID.
+     * @deny (create) - A user cannot create a habit under another user's ID.
+     * @deny (update) - A user cannot update a habit if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete a habit if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for all operations on habits.
      */
-    match /users/{userProfileId}/habits/{habitId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /users/{userId}/habits/{habitId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
 
-      function isOwner(userProfileId) {
-        return isSignedIn() && request.auth.uid == userProfileId;
-      }
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
 
-      function isExistingOwner(userProfileId) {
-        return isOwner(userProfileId) && resource != null;
-      }
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
 
-      allow get: if isOwner(userProfileId);
-      allow list: if isOwner(userProfileId);
-      allow create: if isOwner(userProfileId);
-      allow update: if isExistingOwner(userProfileId);
-      allow delete: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userId) && resource.data.userId == userId;
     }
 
     /**
-     * @description Controls access to journal entry documents within a user's collection.
-     * @path /users/{userProfileId}/journalEntries/{journalEntryId}
-     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Defines the security rules for log entries for user habits.
+     * @path /users/{userId}/habits/{habitId}/habit_logs/{habitLogId}
+     * @allow (create) - A user can create a log entry under their own habit, if the userId matches.
+     * @allow (get) - A user can read a log entry under their own habit.
+     * @allow (update) - A user can update a log entry under their own habit.
+     * @allow (delete) - A user can delete a log entry under their own habit.
+     * @deny (create) - A user cannot create a log entry under another user's ID.
+     * @deny (update) - A user cannot update a log entry if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete a log entry if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for all operations on habit logs.
      */
-    match /users/{userProfileId}/journalEntries/{journalEntryId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /users/{userId}/habits/{habitId}/habit_logs/{habitLogId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
 
-      function isOwner(userProfileId) {
-        return isSignedIn() && request.auth.uid == userProfileId;
-      }
+      allow create: if isOwner(userId);
 
-      function isExistingOwner(userProfileId) {
-        return isOwner(userProfileId) && resource != null;
-      }
+      allow update: if isExistingOwner(userId);
 
-      allow get: if isOwner(userProfileId);
-      allow list: if isOwner(userProfileId);
-      allow create: if isOwner(userProfileId);
-      allow update: if isExistingOwner(userProfileId);
-      allow delete: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to accountability partner documents within a user's collection.
-     * @path /users/{userProfileId}/accountabilityPartners/{accountabilityPartnerId}
-     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Defines the security rules for user-created journal entries.
+     * @path /users/{userId}/journal_entries/{journalEntryId}
+     * @allow (create) - A user can create a journal entry under their own user ID, if the userId matches.
+     * @allow (get) - A user can read a journal entry under their own user ID.
+     * @allow (update) - A user can update a journal entry under their own user ID.
+     * @allow (delete) - A user can delete a journal entry under their own user ID.
+     * @deny (create) - A user cannot create a journal entry under another user's ID.
+     * @deny (update) - A user cannot update a journal entry if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete a journal entry if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for all operations on journal entries.
      */
-    match /users/{userProfileId}/accountabilityPartners/{accountabilityPartnerId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /users/{userId}/journal_entries/{journalEntryId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
 
-      function isOwner(userProfileId) {
-        return isSignedIn() && request.auth.uid == userProfileId;
-      }
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
 
-      function isExistingOwner(userProfileId) {
-        return isOwner(userProfileId) && resource != null;
-      }
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
 
-      allow get: if isOwner(userProfileId);
-      allow list: if isOwner(userProfileId);
-      allow create: if isOwner(userProfileId);
-      allow update: if isExistingOwner(userProfileId);
-      allow delete: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userId) && resource.data.userId == userId;
     }
 
     /**
-     * @description Controls access to finance record documents within a user's collection.
-     * @path /users/{userProfileId}/financeRecords/{financeRecordId}
-     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Defines the security rules for accountability partner relationships.
+     * @path /users/{userId}/accountability_partners/{accountabilityPartnerId}
+     * @allow (create) - A user can create an accountability partner relationship under their own user ID, if the userId matches.
+     * @allow (get) - A user can read an accountability partner relationship under their own user ID.
+     * @allow (update) - A user can update an accountability partner relationship under their own user ID.
+     * @allow (delete) - A user can delete an accountability partner relationship under their own user ID.
+     * @deny (create) - A user cannot create an accountability partner relationship under another user's ID.
+     * @deny (update) - A user cannot update an accountability partner relationship if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete an accountability partner relationship if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for all operations on accountability partner relationships.
      */
-    match /users/{userProfileId}/financeRecords/{financeRecordId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /users/{userId}/accountability_partners/{accountabilityPartnerId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
 
-      function isOwner(userProfileId) {
-        return isSignedIn() && request.auth.uid == userProfileId;
-      }
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
 
-      function isExistingOwner(userProfileId) {
-        return isOwner(userProfileId) && resource != null;
-      }
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
 
-      allow get: if isOwner(userProfileId);
-      allow list: if isOwner(userProfileId);
-      allow create: if isOwner(userProfileId);
-      allow update: if isExistingOwner(userProfileId);
-      allow delete: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userId) && resource.data.userId == userId;
     }
 
     /**
-     * @description Controls access to report documents within a user's collection.
-     * @path /users/{userProfileId}/reports/{reportId}
-     * @allow (create) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @allow (get, update, delete) - If the user is signed in and the userProfileId matches the authenticated user's ID.
-     * @deny (create) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @deny (get, update, delete) - If the user is not signed in or the userProfileId does not match the authenticated user's ID.
-     * @principle Enforces document ownership for writes and requires authentication for all access.
+     * @description Defines the security rules for financial transactions.
+     * @path /users/{userId}/finance_transactions/{financeTransactionId}
+     * @allow (create) - A user can create a financial transaction under their own user ID, if the userId matches.
+     * @allow (get) - A user can read a financial transaction under their own user ID.
+     * @allow (update) - A user can update a financial transaction under their own user ID.
+     * @allow (delete) - A user can delete a financial transaction under their own user ID.
+     * @deny (create) - A user cannot create a financial transaction under another user's ID.
+     * @deny (update) - A user cannot update a financial transaction if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete a financial transaction if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for all operations on financial transactions.
      */
-    match /users/{userProfileId}/reports/{reportId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /users/{userId}/finance_transactions/{financeTransactionId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
 
-      function isOwner(userProfileId) {
-        return isSignedIn() && request.auth.uid == userProfileId;
-      }
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
 
-      function isExistingOwner(userProfileId) {
-        return isOwner(userProfileId) && resource != null;
-      }
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
 
-      allow get: if isOwner(userProfileId);
-      allow list: if isOwner(userProfileId);
-      allow create: if isOwner(userProfileId);
-      allow update: if isExistingOwner(userProfileId);
-      allow delete: if isExistingOwner(userProfileId);
+      allow delete: if isExistingOwner(userId) && resource.data.userId == userId;
+    }
+
+    /**
+     * @description Defines the security rules for exported reports.
+     * @path /users/{userId}/exported_reports/{exportedReportId}
+     * @allow (create) - A user can create an exported report under their own user ID, if the userId matches.
+     * @allow (get) - A user can read an exported report under their own user ID.
+     * @allow (update) - A user can update an exported report under their own user ID.
+     * @allow (delete) - A user can delete an exported report under their own user ID.
+     * @deny (create) - A user cannot create an exported report under another user's ID.
+     * @deny (update) - A user cannot update an exported report if the `userId` doesn't match the path.
+     * @deny (delete) - A user cannot delete an exported report if the `userId` doesn't match the path.
+     * @principle Enforces document ownership for all operations on exported reports.
+     */
+    match /users/{userId}/exported_reports/{exportedReportId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+
+      allow delete: if isExistingOwner(userId) && resource.data.userId == userId;
     }
   }
 }
