@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Sidebar,
+  SidebarProvider,
   SidebarContent,
   SidebarHeader,
   SidebarMenu,
@@ -60,11 +61,11 @@ export function AppSidebar() {
   const isLoading = isUserLoading || isUserProfileLoading;
 
   return (
-    <>
+    <SidebarProvider>
       <div className="md:hidden p-2 bg-background border-b sticky top-0 z-10">
         <SidebarTrigger />
       </div>
-      <Sidebar collapsible="icon">
+      <Sidebar>
         <SidebarHeader>
           <Link href="/dashboard" className="flex items-center gap-2">
             <PillarLogo className="w-8 h-8 text-primary" />
@@ -121,7 +122,7 @@ export function AppSidebar() {
                 <>
                     <Avatar>
                       <AvatarImage src={`https://i.pravatar.cc/150?u=${userProfile?.email}`} />
-                      <AvatarFallback>{userProfile?.name?.charAt(0) || 'P'}</AvatarFallback>
+                      <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
                     </Avatar>
                     <div className="overflow-hidden">
                         <p className="font-semibold text-sm truncate">{userProfile?.name || "User"}</p>
@@ -132,6 +133,6 @@ export function AppSidebar() {
           </div>
         </SidebarFooter>
       </Sidebar>
-    </>
+    </SidebarProvider>
   );
 }
