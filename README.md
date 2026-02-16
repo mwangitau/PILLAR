@@ -1,4 +1,4 @@
-# Pillar: Your Personal AI Companion for Growth
+# Pillar: Your Personal AI Companion for Growth!
 
 Pillar is a comprehensive web application designed to be your personal guide for growth and accountability. It combines personalized planning, habit tracking, journaling, and financial management with the power of AI to provide tailored insights and support on your journey to a better life.
 
