@@ -8,7 +8,7 @@ Pillar is a comprehensive web application designed to be your personal guide for
 -   **AI Personal Manual**: Generate a personalized plan based on your goals and challenges, with AI-driven advice on identity, routines, habits, and more.
 -   **Habit Tracking**: Create, track, and build lasting habits. Monitor your streaks and mark daily completions.
 -   **AI-Driven Journaling**: Record your thoughts and receive AI-powered sentiment and mood analysis to gain deeper self-awareness.
--   **Finance Tracker**: A simple ledger to manage your income, expenses, and tithes, with a clear overview of your financial health.
+-   **Finance Tracker**: A simple ledger to manage your income, expenses, et cetera, with a clear overview of your financial health.
 -   **Accountability Partners**: Invite trusted partners to share your progress. Generate AI-summarized reports on your habits, journal entries, and finances to share with them.
 -   **Secure Authentication**: User accounts are managed securely with Firebase Authentication.
 
